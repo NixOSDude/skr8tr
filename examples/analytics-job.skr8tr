@@ -1,0 +1,20 @@
+# analytics-job.skr8tr
+# Run a compiled analytics binary as a Skr8tr batch job.
+# Skr8tr is process-agnostic — compile with any toolchain, deploy with Skr8tr.
+# Run: skr8tr up analytics-job.skr8tr
+
+app nyc-fare-analysis
+
+  # Pre-built binary — compiled from any language (C, Rust, Go, LambdaC, etc.)
+  bin    ./bin/fare_analysis
+  type   job
+
+  # Resource envelope
+  ram    4gb
+  cpu    8
+
+  # Environment — pass config to the binary
+  env
+    INPUT_PATH   /data/nyc_yellow_2024.csv
+    OUTPUT_PATH  /data/fare_results.csv
+    YEAR         2024

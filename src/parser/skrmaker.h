@@ -3,8 +3,12 @@
  * Skr8tr Sovereign Workload Orchestrator
  *
  * SSoA LEVEL 0 — Sovereign Anchor (struct definitions)
- * These structs are the canonical LambProc descriptor. All daemons
+ * These structs are the canonical SkrProc descriptor. All daemons
  * read from this header. Do not modify without full downstream audit.
+ *
+ * Skr8tr is process-agnostic. It launches binaries — compiled from any
+ * language, built by any toolchain. Source language, data formats, and
+ * analytics frameworks are outside Skr8tr's scope.
  */
 
 #pragma once
@@ -24,7 +28,6 @@
 #define SKRMAKER_ENV_VAL    256
 #define SKRMAKER_MAX_RUNS   16
 #define SKRMAKER_MAX_ENV    64
-#define SKRMAKER_MAX_IO     16
 
 /* -------------------------------------------------------------------------
  * Workload type
@@ -32,24 +35,9 @@
 
 typedef enum {
     SKRTR_TYPE_SERVICE = 0,   /* long-running process (default) */
-    SKRTR_TYPE_JOB,           /* run-to-completion batch job */
+    SKRTR_TYPE_JOB,           /* run-to-completion binary */
     SKRTR_TYPE_WASM,          /* WASM module via wasmtime */
 } SkrtrWorkloadType;
-
-/* -------------------------------------------------------------------------
- * I/O descriptor (for LambdaC jobs: input/output LDB frames)
- * ---------------------------------------------------------------------- */
-
-typedef enum {
-    SKRTR_IO_LDB = 0,
-    SKRTR_IO_FILE,
-} SkrtrIOType;
-
-typedef struct {
-    char        name[SKRMAKER_NAME_LEN];
-    char        alias[SKRMAKER_NAME_LEN];   /* "as alias" — may be empty */
-    SkrtrIOType type;
-} SkrtrIO;
 
 /* -------------------------------------------------------------------------
  * Sub-structs
@@ -88,29 +76,28 @@ typedef struct {
 } SkrtrEnvVar;
 
 /* -------------------------------------------------------------------------
- * LambProc — Canonical Workload Descriptor
+ * SkrProc — Canonical Workload Descriptor
  *
- * One LambProc per `app` block. Multiple apps in one .skr8tr file
+ * One SkrProc per `app` block. Multiple apps in one .skr8tr file
  * are returned as a linked list via the `next` pointer.
+ *
+ * Skr8tr launches bare processes. The binary can be compiled from any
+ * language — C, Rust, Go, LambdaC, WASM, anything. Skr8tr does not care.
  * ---------------------------------------------------------------------- */
 
-typedef struct LambProc {
+typedef struct SkrProc {
     /* identity */
     char               name[SKRMAKER_NAME_LEN];
     SkrtrWorkloadType  workload_type;
 
-    /* process / binary */
-    char               bin[SKRMAKER_PATH_LEN];   /* pre-built binary path */
-    char               lang[32];                  /* "lambdac" | "wasm" | "" */
-    char               src[SKRMAKER_PATH_LEN];    /* source file (lang != "") */
+    /* process */
+    char               bin[SKRMAKER_PATH_LEN];   /* path to binary */
 
     /* resources */
     int                port;
     int                replicas;
     int64_t            ram_bytes;
     int                cpu_cores;
-    int                nodes;       /* mesh nodes for distributed jobs */
-    int                gpu_optional;
 
     /* sub-blocks */
     SkrtrBuild         build;
@@ -118,22 +105,13 @@ typedef struct LambProc {
     SkrtrHealth        health;
     SkrtrScale         scale;
 
-    /* environment variables */
+    /* environment variables injected into each instance */
     SkrtrEnvVar        env[SKRMAKER_MAX_ENV];
     int                env_count;
 
-    /* LambdaC job I/O */
-    SkrtrIO            inputs[SKRMAKER_MAX_IO];
-    int                input_count;
-    SkrtrIO            outputs[SKRMAKER_MAX_IO];
-    int                output_count;
-
-    /* lifecycle hooks */
-    char               on_complete_webhook[SKRMAKER_URL_LEN];
-
     /* linked list — multiple apps per file */
-    struct LambProc*   next;
-} LambProc;
+    struct SkrProc*    next;
+} SkrProc;
 
 /* -------------------------------------------------------------------------
  * Public API
@@ -142,20 +120,20 @@ typedef struct LambProc {
 /*
  * skrmaker_parse — Parse a .skr8tr manifest file.
  *
- * Returns the head of a LambProc linked list (one node per `app` block),
+ * Returns the head of a SkrProc linked list (one node per `app` block),
  * or NULL on error. On error, `err` is populated with a human-readable
  * message including file path and line number.
  *
  * Caller owns the returned list; free with skrmaker_free().
  */
-LambProc* skrmaker_parse(const char* path, char* err, size_t err_len);
+SkrProc* skrmaker_parse(const char* path, char* err, size_t err_len);
 
 /*
  * skrmaker_free — Release all memory allocated by skrmaker_parse().
  */
-void skrmaker_free(LambProc* proc);
+void skrmaker_free(SkrProc* proc);
 
 /*
- * skrmaker_dump — Print a parsed LambProc list to stdout (debug).
+ * skrmaker_dump — Print a parsed SkrProc list to stdout (debug).
  */
-void skrmaker_dump(const LambProc* proc);
+void skrmaker_dump(const SkrProc* proc);

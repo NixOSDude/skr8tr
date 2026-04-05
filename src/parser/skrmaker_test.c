@@ -20,7 +20,7 @@ int main(int argc, char* argv[]) {
     int all_ok = 1;
     for (int i = 1; i < argc; i++) {
         char err[512] = {0};
-        LambProc* procs = skrmaker_parse(argv[i], err, sizeof(err));
+        SkrProc* procs = skrmaker_parse(argv[i], err, sizeof(err));
         if (!procs) {
             fprintf(stderr, "FAIL  %s\n  %s\n", argv[i], err);
             all_ok = 0;
