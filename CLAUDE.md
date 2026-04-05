@@ -63,13 +63,16 @@ Skr8tr worker targets. LambdaC `.lc` programs are first-class Skr8tr workload un
 
 ---
 
-## Workload Unit — LambProc
+## Workload Unit — SkrProc
 
 Skr8tr workloads are **bare processes** (no containers, no OCI):
-- Native binaries run directly on the host
+- Native binaries run directly on the host — compiled from any language
 - WASM modules via wasmtime (optional portable target)
-- LambdaC `.lc` programs compiled by the Brain and deployed as native binaries
 - Static web apps served by `skr8tr_serve.c` (no nginx required)
+
+Skr8tr is **process-agnostic**. It does not know or care what language a binary
+was compiled from. Source language, data formats, and analytics frameworks are
+outside Skr8tr's scope. A LambdaC job is just `bin ./my_lambdac_binary`.
 
 ---
 
@@ -192,4 +195,4 @@ Only beam up after Captain confirms milestone success.
 | `MILESTONES.md` | Sovereign history — read first on every session start |
 | `SESSION_STATE.md` | In-progress state, blockers, next steps |
 | `examples/react-app.skr8tr` | Reference SkrtrMaker manifest for static web app |
-| `examples/lambdac-job.skr8tr` | Reference manifest for LambdaC analytics workload |
+| `examples/analytics-job.skr8tr` | Reference manifest for a compiled batch job workload |

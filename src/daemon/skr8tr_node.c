@@ -212,7 +212,7 @@ static void proc_reap(void) {
 }
 
 /* -------------------------------------------------------------------------
- * LAUNCH — fork/exec a workload from a LambProc descriptor
+ * LAUNCH — fork/exec a workload from a SkrProc descriptor
  * ---------------------------------------------------------------------- */
 
 static void free_env_array(char** env, int count) {
@@ -222,11 +222,11 @@ static void free_env_array(char** env, int count) {
 }
 
 /*
- * launch_proc — fork and exec a workload described by a LambProc.
+ * launch_proc — fork and exec a workload described by a SkrProc.
  * Populates a ManagedProc slot.
  * Returns pid on success, -1 on error.
  */
-static pid_t launch_proc(const LambProc* lp, char* err, size_t err_len) {
+static pid_t launch_proc(const SkrProc* lp, char* err, size_t err_len) {
     /* Determine the binary path.
      * Static serve workloads exec skr8tr_serve from the same directory
      * as this node binary, passing --dir and --port arguments. */
@@ -293,11 +293,11 @@ static pid_t launch_proc(const LambProc* lp, char* err, size_t err_len) {
     char** argv_exec = lp->serve.is_static && !lp->bin[0]
                      ? serve_argv : argv_simple;
 
-    /* Build envp from LambProc env block */
+    /* Build envp from SkrProc env block */
     char** injected_env = NULL;
     int    injected_count = 0;
 
-    /* Construct K=V strings from the LambProc env array */
+    /* Construct K=V strings from the SkrProc env array */
     if (lp->env_count > 0) {
         injected_env = calloc(lp->env_count + 1, sizeof(char*));
         if (injected_env) {
@@ -460,14 +460,14 @@ static void handle_command(const char* cmd, size_t cmd_len,
             return;
         }
 
-        /* Build a minimal LambProc from the extracted fields */
-        LambProc lp = {0};
+        /* Build a minimal SkrProc from the extracted fields */
+        SkrProc lp = {0};
         snprintf(lp.name, sizeof(lp.name), "%s", name);
         snprintf(lp.bin,  sizeof(lp.bin),  "%s", bin);
         lp.port         = port_s[0] ? (int)strtol(port_s, NULL, 10) : 0;
         lp.workload_type = SKRTR_TYPE_SERVICE;
 
-        /* Parse env K=V,K2=V2 into LambProc env array */
+        /* Parse env K=V,K2=V2 into SkrProc env array */
         if (env_s[0]) {
             char* copy = strdup(env_s);
             char* tok  = strtok(copy, ",");
@@ -523,13 +523,13 @@ static void* heartbeat_thread(void* arg) {
 
 static void run_manifest(const char* path) {
     char err[512] = {0};
-    LambProc* procs = skrmaker_parse(path, err, sizeof(err));
+    SkrProc* procs = skrmaker_parse(path, err, sizeof(err));
     if (!procs) {
         fprintf(stderr, "[node] --run: parse failed: %s\n", err);
         return;
     }
 
-    for (LambProc* p = procs; p; p = p->next) {
+    for (SkrProc* p = procs; p; p = p->next) {
         char launch_err[256] = {0};
         pid_t pid = launch_proc(p, launch_err, sizeof(launch_err));
         if (pid < 0)
