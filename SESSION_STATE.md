@@ -6,53 +6,65 @@
 
 ### Last Completed Task
 
-**Phase 1 — SkrtrMaker Parser + Fleet Node Daemon — COMPLETE**
+**Phase 2 — `skr8tr_serve.c` Sovereign Static File Server — COMPLETE**
 
-All three steps verified and committed:
-- `src/parser/skrmaker.h` + `skrmaker.c` — SkrtrMaker file parser, SSoA LEVEL 1
-- `src/core/fabric.h` + `fabric.c` — UDP mesh primitives, SSoA LEVEL 1
-- `src/daemon/skr8tr_node.c` — Fleet node daemon, SSoA LEVEL 1
+Full integration verified:
+- skr8tr_node --run manifest.skr8tr with `serve static <dir>` automatically
+  locates and execs skr8tr_serve with --dir and --port arguments
+- HTTP/1.1 GET, HEAD, 200, 304 (ETag), 404→SPA fallback all verified
+- sendfile() zero-copy, detached pthreads per connection
+- MIME table: 23 types including wasm, woff2, map
+- Path traversal protection via realpath() + prefix jail
 
-UDP commands verified live: PING, STATUS, LAUNCH, KILL
-ML-DSA-65 ephemeral identity working via liboqs-0.15.0
-`--run <manifest.skr8tr>` path working (parse → fork/exec on startup)
+Phases 1 + 2 together: parse manifest → launch node → serve static app
+The k8s killer stack is operational at the foundation level.
 
 ### Next Task (resume here)
 
-**Phase 2 — `src/server/skr8tr_serve.c`**
+**Phase 3 — `src/daemon/skr8tr_sched.c` — The Conductor**
 
-Static file server for any app's build output. No nginx.
+Masterless capacity-aware scheduler. This is the k8s killer's brain.
 
-- HTTP/1.1 GET handler — serves files from a configured directory root
-- Launched by `skr8tr_node` when a manifest has `serve static <dir>`
-- Listens on configured port (default 7773 per CLAUDE.md)
-- MIME type detection: html, css, js, json, wasm, png, jpg, svg, ico, txt
-- 404 handler, directory index (serve index.html for `/`)
-- Single-threaded with `accept()` loop or `pthread` per connection
+Requirements:
+- Listen on UDP port 7771 (Conductor channel per CLAUDE.md)
+- Also listen on 7770 to receive HEARTBEAT datagrams from all nodes
+- Maintain a node registry: node_id → { ip, cpu_pct, ram_free_mb, last_seen }
+- Expire nodes not seen for 15s (dead node detection)
+- Accept workload submissions: SUBMIT|<manifest_path>
+- For each workload, pick the least-loaded eligible node and send LAUNCH|...
+- Monitor replica counts: if a replica dies (node disappears), relaunch on
+  another node
+- Implement scale-up: if cpu_pct > cpu-above threshold for >2 heartbeat cycles,
+  launch additional replica (up to max)
+- Implement scale-down: if cpu_pct < cpu-below threshold for >4 cycles,
+  send KILL to one replica (down to min)
+- No leader election. No SPOF. The Conductor is stateless — any node can run it.
+  Multiple Conductors on a subnet converge via consistent-hash assignment.
 - SSoA LEVEL 1
-- ~250 lines C23, zero dependencies
-
-After skr8tr_serve.c:
-- STEP 3 full integration: `skr8tr up react-app.skr8tr` should parse manifest,
-  detect `serve static`, launch skr8tr_serve against the built ./dist directory,
-  and serve the static app.
 
 ### Open Blockers
 - None
 
 ### Files Modified This Session
-- Makefile (gnu23, parser sources added to node build)
-- src/parser/skrmaker.h (NEW — SSoA LEVEL 0 structs)
-- src/parser/skrmaker.c (NEW — parser implementation)
-- src/parser/skrmaker_test.c (NEW — smoke test)
-- src/core/fabric.h (NEW — UDP mesh API)
-- src/core/fabric.c (NEW — UDP socket layer)
-- src/daemon/skr8tr_node.c (NEW — fleet node daemon)
-- MILESTONES.md (Phase 1 milestone appended)
+- src/server/skr8tr_serve.c (NEW — HTTP/1.1 static file server)
+- src/daemon/skr8tr_node.c (updated — auto-launches skr8tr_serve for static workloads)
+- MILESTONES.md (Phase 2 milestone appended)
 
-### Notes
-- Build command: gcc -std=gnu23 with explicit nix store paths for liboqs
-  OQS_INC: /nix/store/ivgra1x5vxd2frx380l5lbnycifr6fvm-liboqs-0.15.0-dev/include
-  OQS_LIB: /nix/store/l8p18zsf1jaivqfs14q0aq1dvb3cqr7a-liboqs-0.15.0/lib
-- bin/ is gitignored — build fresh after checkout
-- Zero LambdaC files were modified. Skr8tr is a fully sovereign codebase.
+### Architecture Notes (Captain additions)
+- Skr8tr is elastic: scale up/down is driven by cpu_pct from heartbeats
+- No GPU dependency — GPU is LambdaC's domain
+- Hardware/cloud agnostic: UDP mesh, bare processes, no cloud SDK
+- skr8tr_serve serves ANY static app (React, Vue, Svelte, raw HTML, WASM) —
+  not React-specific, the example is just illustrative
+
+### Build Commands
+gcc -std=gnu23 -Wall -Wextra -O2 \
+  -I./src/core -I./src/parser \
+  -I/nix/store/ivgra1x5vxd2frx380l5lbnycifr6fvm-liboqs-0.15.0-dev/include \
+  src/daemon/skr8tr_node.c src/core/fabric.c src/parser/skrmaker.c \
+  -o bin/skr8tr_node \
+  -L/nix/store/l8p18zsf1jaivqfs14q0aq1dvb3cqr7a-liboqs-0.15.0/lib \
+  -loqs -lpthread
+
+gcc -std=gnu23 -Wall -Wextra -O2 -I./src/core \
+  src/server/skr8tr_serve.c -o bin/skr8tr_serve -lpthread

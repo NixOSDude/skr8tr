@@ -227,13 +227,46 @@ static void free_env_array(char** env, int count) {
  * Returns pid on success, -1 on error.
  */
 static pid_t launch_proc(const LambProc* lp, char* err, size_t err_len) {
-    /* Determine the binary path */
-    const char* bin = lp->bin[0] ? lp->bin
-                    : lp->serve.is_static ? NULL  /* served by skr8tr_serve */
-                    : NULL;
+    /* Determine the binary path.
+     * Static serve workloads exec skr8tr_serve from the same directory
+     * as this node binary, passing --dir and --port arguments. */
+    char serve_bin[600];
+    char serve_dir_arg[512];
+    char serve_port_arg[32];
+    char* serve_argv[6];   /* skr8tr_serve --dir <d> --port <p> NULL */
 
-    /* Static serve: the node doesn't exec a binary — it signals skr8tr_serve.
-     * For Phase 1 we exec the binary directly if bin is set. */
+    const char* bin = lp->bin[0] ? lp->bin : NULL;
+
+    if (!bin && lp->serve.is_static) {
+        /* Locate skr8tr_serve next to the running node binary */
+        char self_path[512];
+        ssize_t self_len = readlink("/proc/self/exe", self_path, sizeof(self_path) - 1);
+        if (self_len > 0) {
+            self_path[self_len] = '\0';
+            char* last_slash    = strrchr(self_path, '/');
+            if (last_slash) {
+                *(last_slash + 1) = '\0';
+                snprintf(serve_bin, sizeof(serve_bin), "%sskr8tr_serve", self_path);
+            }
+        } else {
+            strncpy(serve_bin, "skr8tr_serve", sizeof(serve_bin) - 1);
+        }
+
+        int serve_port = lp->serve.port ? lp->serve.port : 7773;
+        snprintf(serve_dir_arg,  sizeof(serve_dir_arg),  "%s",
+                 lp->serve.static_dir[0] ? lp->serve.static_dir : ".");
+        snprintf(serve_port_arg, sizeof(serve_port_arg), "%d", serve_port);
+
+        serve_argv[0] = serve_bin;
+        serve_argv[1] = (char*)"--dir";
+        serve_argv[2] = serve_dir_arg;
+        serve_argv[3] = (char*)"--port";
+        serve_argv[4] = serve_port_arg;
+        serve_argv[5] = NULL;
+
+        bin = serve_bin;
+    }
+
     if (!bin || bin[0] == '\0') {
         snprintf(err, err_len, "no binary path for app '%s'", lp->name);
         return -1;
@@ -255,8 +288,10 @@ static pid_t launch_proc(const LambProc* lp, char* err, size_t err_len) {
     slot->port   = lp->port;
     pthread_mutex_unlock(&g_procs_mu);
 
-    /* Build argv: { bin, NULL } — extend for complex workloads later */
-    char* argv_exec[] = { (char*)bin, NULL };
+    /* argv: use serve_argv for static workloads, otherwise { bin, NULL } */
+    char* argv_simple[] = { (char*)bin, NULL };
+    char** argv_exec = lp->serve.is_static && !lp->bin[0]
+                     ? serve_argv : argv_simple;
 
     /* Build envp from LambProc env block */
     char** injected_env = NULL;

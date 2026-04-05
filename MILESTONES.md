@@ -62,11 +62,53 @@ Build Phase 1: SkrtrMaker parser + skr8tr_node.c worker daemon
 - Node ID = hex of first 16 bytes of ML-DSA-65 public key — ephemeral, not stored
 - Zero LambdaC source files modified — Skr8tr is a fully sovereign codebase
 
+---
+
+## [2026-04-05] main — Phase 2 Complete: Sovereign Static File Server
+
+### Files Delivered
+- `src/server/skr8tr_serve.c` — SSoA LEVEL 1: HTTP/1.1 static file server
+
+### Verified
+- `GET /` → 200 + index.html (directory auto-index) ✓
+- `GET /index.html` → 200 + correct MIME `text/html; charset=utf-8` ✓
+- `HEAD` → 200 + headers, no body ✓
+- `GET /missing` → 200 + index.html (SPA fallback — correct for React routing) ✓
+- ETag round-trip: `If-None-Match` → 304 Not Modified ✓
+- `skr8tr_node --run manifest.skr8tr` with `serve static <dir>` → auto-launches
+  skr8tr_serve with `--dir` and `--port` args ✓
+- Full integration: parse manifest → fork skr8tr_serve → serve HTML → STATUS
+  shows process in node table ✓
+
+### Design Decisions
+- `sendfile(2)` for zero-copy file transfer — kernel handles data path
+- ETag = hex(mtime) + hex(size) — lightweight, no content hashing required
+- SPA fallback: unknown paths serve `<root>/index.html` — React/Vue router works
+- Path traversal: `realpath()` + prefix check — jail to static root, no escape
+- MIME table covers html, css, js, mjs, json, wasm, svg, png, jpg, gif, webp,
+  ico, pdf, txt, map, xml, ttf, woff, woff2
+- Detached pthread per connection, SO_REUSEADDR + SO_REUSEPORT on listener
+- `Cache-Control: public, max-age=3600` — browsers cache assets for 1 hour
+- No nginx. No Node. No Apache. Zero external dependencies.
+- Hardware/cloud agnostic: runs on bare metal, VPS, ARM, x86, GCP VM, NUC, Pi
+- No GPU dependency — GPU is LambdaC's domain, not Skr8tr's
+
+### Architecture Notes (Captain additions this session)
+- Elasticity: `scale { min, max, cpu-above, cpu-below }` already in LambProc structs.
+  The Conductor (skr8tr_sched.c) will consume heartbeat metrics and issue
+  LAUNCH/KILL commands to grow/shrink replica counts. Node already broadcasts
+  cpu_pct + ram_free_mb every 5s as input to scaling decisions.
+- Hardware/cloud agnostic by design: bare process on any Linux host, UDP mesh
+  auto-discovers peers on subnet — no cloud SDK, no container runtime.
+
 ### Next Milestone
-Phase 2: `skr8tr_serve.c` — static file server (serve any app's dist/, no nginx)
-- HTTP/1.1 GET handler for static directories
-- Port from CLAUDE.md: 7773 (external ingress)
-- Serves whatever `serve static <dir>` points to — React, Vue, raw HTML, WASM, anything
+Phase 3: `skr8tr_sched.c` — The Conductor
+- Masterless capacity-aware scheduler
+- Consumes HEARTBEAT stream from all nodes
+- Assigns LAUNCH commands to least-loaded nodes
+- Enforces replica counts from LambProc descriptors
+- Implements scale up/down using cpu-above/cpu-below thresholds
+- No leader election. No SPOF. Any node can run the Conductor.
 
 ---
 
