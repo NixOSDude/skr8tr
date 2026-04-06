@@ -1,61 +1,73 @@
 # SESSION_STATE.md — Skr8tr Session Handoff
-## Branch: main
+## Branch: feature/sovereign-multiplication-logic
 ## Date: 2026-04-05
 
 ---
 
 ### Last Completed Task
 
-**ALL 5 PHASES COMPLETE — Full Skr8tr Stack Operational**
+**Phase 6 COMPLETE — VM Orchestration + Production Hardening**
 
-Phases 3, 4, and 5 completed this session:
-- Phase 3: skr8tr_sched.c — The Conductor (masterless scheduler)
-- Phase 4: skr8tr_reg.c  — The Tower (service registry, round-robin lookup)
-- Phase 5: cli/src/main.rs — The Deck (Rust CLI: up/down/status/nodes/list/lookup/ping)
+All Phase 6 deliverables verified and committed:
 
-Full integration verified:
-  skr8tr ping   → conductor + tower both ok
-  skr8tr nodes  → live node table with cpu% and ram
-  skr8tr up     → manifest submitted, replicas placed on mesh
-  skr8tr status → nodes + placement table
-  skr8tr down   → workload evicted, replicas killed
-  skr8tr list   → 0 replicas after eviction
+1. **VM launch** — QEMU argv builder + Firecracker JSON config generator in `skr8tr_node.c`
+2. **Log capture** — per-process pipe → `LogRing` ring buffer (200×256); `LOGS|<app>` command
+3. **Health check enforcement** — HTTP GET probe in heartbeat thread; kill on repeated failure  
+4. **Tower auto-registration** — REGISTER on launch, DEREGISTER on kill
+5. **Persistent Conductor state** — `state_save()` / `state_load()` with `/tmp/skr8tr_conductor.state`
+6. **CLI `logs` command** — two-step node resolution (LIST → NODES → LOGS:7775)
+7. **Dual-socket node** — port 7770 mesh + port 7775 dedicated command port (fixes port contention)
+8. **`examples/vm-workload.skr8tr`** — Firecracker microVM manifest example
+
+Integration test all-green:
+  skr8tr ping  → conductor ok, tower ok
+  skr8tr nodes → live node table
+  skr8tr up    → submitted, state persisted
+  skr8tr list  → replicas listed
+  skr8tr logs  → end-to-end 0-line capture (no-output binary — correct)
+  skr8tr down  → evicted, state cleared
+  skr8tr status → 0 replicas
 
 ### Next Task (resume here)
 
-**Phase 6 — Choose one:**
+**Phase 7 — Choose one:**
 
-Option A: VM/Hypervisor workloads
-  - SkrtrMaker `type wasm` already in parser
-  - Add `type vm` support: bin points at Firecracker or QEMU
-  - skr8tr_node detects `type vm` and launches with hypervisor wrapper
-  - Enables full OS orchestration — any guest OS on any host
+Option A: NixOS overlay + commercial packaging
+  - `shell.nix` upgrade: pin all deps (gcc, liboqs, rustup) in a Nix flake overlay
+  - Ensures reproducible builds — same binary every time, every machine
+  - Required for commercial distribution ($19.99/site/month license)
+  - Discussion: Captain raised $19.99/site/month closed-source model — see Notes below
 
-Option B: Production hardening
-  - Persistent workload state (survive Conductor restart)
-  - Log streaming: `skr8tr logs <app>` tails process stdout via UDP
-  - skr8tr_node auto-registers launched services with the Tower
-  - Health check enforcement: node kills and relaunches failing processes
+Option B: TLS on Tower
+  - Encrypt Tower registration/lookup with TLS (or PQC KEM key exchange)
+  - Prevents rogue nodes from hijacking service registry
+  - Low-cost hardening for production trust
 
-Recommend: Option B first (makes current stack production-usable),
-           then Option A (extends scope to VM orchestration).
+Option C: Multi-node test on real hardware
+  - Provision two VMs / physical machines
+  - Deploy Skr8tr on both, verify cross-machine heartbeat + LAUNCH routing
+  - Confirm elastic scale-up across real network
+
+Recommend: Option A (NixOS overlay) — unlocks the commercial distribution path Captain discussed.
 
 ### Open Blockers
-- CLI binary must be built with absolute rustc path (not in nix shell PATH):
-  RUSTC=~/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc \
-  ~/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo build --release
-- Daemons must be launched with absolute paths (not relative bin/ paths)
-  due to nix shell working directory behavior
+- None — all Phase 6 items complete
+- Port 7770 shared between conductor (mesh receive) and node (heartbeat send) is
+  resolved by the dual-socket design (7775 for commands). Cross-machine deployment
+  has no conflict since conductor and nodes run on separate hosts.
 
 ### Files Modified This Session
-- src/daemon/skr8tr_sched.c (NEW — Phase 3)
-- src/daemon/skr8tr_reg.c   (NEW — Phase 4)
-- cli/Cargo.toml             (NEW — Phase 5)
-- cli/src/main.rs            (NEW — Phase 5)
-- MILESTONES.md
-- SESSION_STATE.md
+- `src/parser/skrmaker.h`    (SkrtrVM struct, SKRTR_TYPE_VM)
+- `src/parser/skrmaker.c`    (parse_vm, type vm)
+- `src/daemon/skr8tr_node.c` (Phase 6 full rewrite — 960+ lines)
+- `src/daemon/skr8tr_sched.c`(persistent state: state_save/state_load/manifest_path)
+- `cli/src/main.rs`          (logs command, port 7775 for node queries)
+- `examples/vm-workload.skr8tr` (NEW)
+- `MILESTONES.md`
+- `SESSION_STATE.md`
 
 ### Build Commands
+```bash
 # C23 daemons (from /home/sbaker/skr8tr):
 gcc -std=gnu23 -Wall -Wextra -O2 \
   -I./src/core -I./src/parser \
@@ -80,3 +92,13 @@ gcc -std=gnu23 -Wall -Wextra -O2 -I./src/core \
 # Rust CLI:
 cd cli && RUSTC=~/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc \
   ~/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo build --release
+```
+
+### Notes
+- Captain asked about closed-source commercial model: $19.99/site/month, no open source
+- Feasibility: YES — Skr8tr has no viral GPL deps (liboqs is MIT, all C/Rust stdlib)
+- Captain wants NixOS overlay to lock build reproducibility for commercial distribution
+- NixOS overlay = `flake.nix` that pins every dep hash — same binary guaranteed on any NixOS host
+- Distribution model: customers download binary + activate with license key
+  - License key server is minimal (just validates key, no telemetry)
+  - Or simpler: offline license (signed with ML-DSA-65 private key — very sovereign)

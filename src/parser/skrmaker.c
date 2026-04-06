@@ -253,6 +253,28 @@ static int parse_env(Parser* p, SkrProc* proc, int parent_indent) {
     return 1;
 }
 
+static int parse_vm(Parser* p, SkrProc* proc, int parent_indent) {
+    char* line;
+    while ((line = read_line(p))) {
+        char* s = ltrim(line);
+        if (*s == '}') return 1;
+        int ind = indent_of(line);
+        if (ind <= parent_indent) { push_back(p); return 1; }
+
+        char* key; char* val;
+        split_kv(line, &key, &val);
+
+        if      (!strcmp(key, "hypervisor")) strncpy(proc->vm.hypervisor, val, sizeof(proc->vm.hypervisor) - 1);
+        else if (!strcmp(key, "kernel"))     strncpy(proc->vm.kernel,     val, sizeof(proc->vm.kernel)     - 1);
+        else if (!strcmp(key, "rootfs"))     strncpy(proc->vm.rootfs,     val, sizeof(proc->vm.rootfs)     - 1);
+        else if (!strcmp(key, "vcpus"))      proc->vm.vcpus     = (int)strtol(val, NULL, 10);
+        else if (!strcmp(key, "memory"))     proc->vm.memory_mb = (int)strtol(val, NULL, 10);
+        else if (!strcmp(key, "net"))        strncpy(proc->vm.net,        val, sizeof(proc->vm.net)        - 1);
+        else if (!strcmp(key, "args"))       strncpy(proc->vm.extra_args, val, sizeof(proc->vm.extra_args) - 1);
+    }
+    return 1;
+}
+
 /* -------------------------------------------------------------------------
  * Top-level `app` block parser
  * ---------------------------------------------------------------------- */
@@ -283,12 +305,14 @@ static int parse_app(Parser* p, SkrProc* proc) {
             if      (!strcmp(val, "job"))     proc->workload_type = SKRTR_TYPE_JOB;
             else if (!strcmp(val, "service")) proc->workload_type = SKRTR_TYPE_SERVICE;
             else if (!strcmp(val, "wasm"))    proc->workload_type = SKRTR_TYPE_WASM;
+            else if (!strcmp(val, "vm"))      proc->workload_type = SKRTR_TYPE_VM;
         }
         else if (!strcmp(key, "build"))  parse_build(p, proc, app_indent);
         else if (!strcmp(key, "serve"))  parse_serve(p, proc, app_indent);
         else if (!strcmp(key, "health")) parse_health(p, proc, app_indent);
         else if (!strcmp(key, "scale"))  parse_scale(p, proc, app_indent);
         else if (!strcmp(key, "env"))    parse_env(p, proc, app_indent);
+        else if (!strcmp(key, "vm"))     parse_vm(p, proc, app_indent);
         /* unknown keys silently accepted for forward compatibility */
     }
     return 1;
@@ -394,7 +418,8 @@ void skrmaker_dump(const SkrProc* proc) {
         printf("  type      %s\n",
                p->workload_type == SKRTR_TYPE_SERVICE ? "service" :
                p->workload_type == SKRTR_TYPE_JOB     ? "job"     :
-               p->workload_type == SKRTR_TYPE_WASM    ? "wasm"    : "unknown");
+               p->workload_type == SKRTR_TYPE_WASM    ? "wasm"    :
+               p->workload_type == SKRTR_TYPE_VM      ? "vm"      : "unknown");
         if (p->port)      printf("  port      %d\n",   p->port);
         if (p->replicas)  printf("  replicas  %d\n",   p->replicas);
         if (p->ram_bytes) printf("  ram       %lld B\n", (long long)p->ram_bytes);
@@ -435,6 +460,17 @@ void skrmaker_dump(const SkrProc* proc) {
         for (int i = 0; i < p->env_count; i++) {
             if (i == 0) printf("  env\n");
             printf("    %s  %s\n", p->env[i].key, p->env[i].val);
+        }
+
+        if (p->workload_type == SKRTR_TYPE_VM && p->vm.kernel[0]) {
+            printf("  vm\n");
+            if (p->vm.hypervisor[0]) printf("    hypervisor  %s\n", p->vm.hypervisor);
+            if (p->vm.kernel[0])     printf("    kernel      %s\n", p->vm.kernel);
+            if (p->vm.rootfs[0])     printf("    rootfs      %s\n", p->vm.rootfs);
+            if (p->vm.vcpus)         printf("    vcpus       %d\n", p->vm.vcpus);
+            if (p->vm.memory_mb)     printf("    memory      %d MB\n", p->vm.memory_mb);
+            if (p->vm.net[0])        printf("    net         %s\n", p->vm.net);
+            if (p->vm.extra_args[0]) printf("    args        %s\n", p->vm.extra_args);
         }
 
         if (p->next) printf("\n");

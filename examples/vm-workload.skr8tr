@@ -1,0 +1,37 @@
+# vm-workload.skr8tr — Example: Full OS microVM via Firecracker
+# Demonstrates SKRTR_TYPE_VM: Skr8tr launches a full OS image as a workload.
+#
+# Skr8tr treats a VM exactly like any other workload:
+#   - Replica scheduling: Conductor places instances on mesh nodes
+#   - Health checking: HTTP probe against the guest-forwarded port
+#   - Scale up/down: heartbeat-driven, same as any service
+#   - Log capture: hypervisor stdout captured into node ring buffer
+#
+# Prerequisites:
+#   apt install firecracker         (or: pacman -S firecracker)
+#   Download kernel:  https://s3.amazonaws.com/spec.ccfc.min/firecracker-ci/v1.9/x86_64/vmlinux-6.1.102
+#   Build rootfs:     scripts/build-ubuntu-rootfs.sh (produces ubuntu-22.04.ext4)
+
+app ubuntu-web
+  type vm
+  port 8080
+  replicas 1
+
+  vm
+    hypervisor /usr/bin/firecracker
+    kernel /var/skr8tr/kernels/vmlinux-6.1.102
+    rootfs /var/skr8tr/images/ubuntu-22.04.ext4
+    vcpus 2
+    memory 512
+    net user
+
+  health
+    check GET / 200
+    interval 30s
+    retries 3
+
+  scale
+    min 1
+    max 4
+    cpu-above 70
+    cpu-below 20

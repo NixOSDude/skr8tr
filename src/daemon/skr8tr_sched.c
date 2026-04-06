@@ -52,7 +52,8 @@
  * ---------------------------------------------------------------------- */
 
 #define SCHED_PORT          7771
-#define MESH_PORT           7770
+#define MESH_PORT           7770   /* heartbeat receive port */
+#define NODE_CMD_PORT       7775   /* node command port: LAUNCH/KILL/STATUS */
 #define NODE_EXPIRY_S       15
 #define MAX_NODES           256
 #define MAX_WORKLOADS       256
@@ -60,6 +61,7 @@
 #define SCALE_UP_CYCLES     2    /* consecutive high-CPU heartbeats before scale-up */
 #define SCALE_DOWN_CYCLES   4    /* consecutive low-CPU heartbeats before scale-down */
 #define REBALANCE_INTERVAL  5    /* seconds between replica health checks */
+#define STATE_FILE          "/tmp/skr8tr_conductor.state"  /* persistent workload state */
 
 /* -------------------------------------------------------------------------
  * Node table — live view of the mesh
@@ -96,6 +98,7 @@ typedef struct {
 
 typedef struct {
     char            app_name[128];
+    char            manifest_path[512]; /* original .skr8tr path — for state persistence */
     SkrProc         spec;             /* parsed manifest */
     Placement       replicas[MAX_REPLICAS];
     int             replica_count;
@@ -104,6 +107,57 @@ typedef struct {
 
 static Workload          g_workloads[MAX_WORKLOADS];
 static pthread_mutex_t   g_workloads_mu = PTHREAD_MUTEX_INITIALIZER;
+
+/* -------------------------------------------------------------------------
+ * Persistent state — survive Conductor restarts
+ * ---------------------------------------------------------------------- */
+
+static int g_state_loading = 0;  /* suppresses state_save during state_load replay */
+
+/* Forward declaration — defined later in this file */
+static int submit_workload(const char* manifest_path, char* resp, size_t resp_len);
+
+/* Write all active workload manifest paths to the state file.
+ * Must be called OUTSIDE any held mutex — acquires g_workloads_mu internally. */
+static void state_save(void) {
+    if (g_state_loading) return;
+    FILE* f = fopen(STATE_FILE, "w");
+    if (!f) {
+        fprintf(stderr, "[sched] WARNING: cannot write state file %s: %s\n",
+                STATE_FILE, strerror(errno));
+        return;
+    }
+    pthread_mutex_lock(&g_workloads_mu);
+    for (int i = 0; i < MAX_WORKLOADS; i++) {
+        if (g_workloads[i].active && g_workloads[i].manifest_path[0])
+            fprintf(f, "SUBMIT|%s\n", g_workloads[i].manifest_path);
+    }
+    pthread_mutex_unlock(&g_workloads_mu);
+    fclose(f);
+}
+
+/* Read state file and re-submit all workloads.
+ * Called once at startup — before the main loop. */
+static void state_load(char* resp, size_t resp_len) {
+    FILE* f = fopen(STATE_FILE, "r");
+    if (!f) return;   /* no state file = fresh start */
+    g_state_loading = 1;
+    char line[520];
+    int  restored = 0;
+    while (fgets(line, sizeof(line), f)) {
+        char* nl = strchr(line, '\n'); if (nl) *nl = '\0';
+        if (!strncmp(line, "SUBMIT|", 7) && line[7]) {
+            resp[0] = '\0';
+            submit_workload(line + 7, resp, resp_len);
+            printf("[sched] state restore: %s\n", resp);
+            restored++;
+        }
+    }
+    fclose(f);
+    g_state_loading = 0;
+    if (restored)
+        printf("[sched] restored %d workload(s) from %s\n", restored, STATE_FILE);
+}
 
 /* -------------------------------------------------------------------------
  * Node table helpers
@@ -201,7 +255,7 @@ static int launch_replica(Workload* wl, NodeEntry* node) {
         snprintf(cmd, sizeof(cmd), "LAUNCH|name=%s|bin=%s|port=%d",
                  sp->name, sp->bin, sp->port);
 
-    if (fabric_send(send_sock, node->ip, MESH_PORT, cmd, strlen(cmd)) < 0) {
+    if (fabric_send(send_sock, node->ip, NODE_CMD_PORT, cmd, strlen(cmd)) < 0) {
         fprintf(stderr, "[sched] send LAUNCH to %s failed: %s\n",
                 node->ip, strerror(errno));
         return 0;
@@ -263,7 +317,8 @@ static int submit_workload(const char* manifest_path,
             return 0;
         }
 
-        snprintf(wl->app_name, sizeof(wl->app_name), "%s", sp->name);
+        snprintf(wl->app_name,      sizeof(wl->app_name),      "%s", sp->name);
+        snprintf(wl->manifest_path, sizeof(wl->manifest_path), "%s", manifest_path);
         wl->spec   = *sp;
         wl->active = 1;
         int desired    = sp->replicas > 0 ? sp->replicas : 1;
@@ -299,6 +354,7 @@ static int submit_workload(const char* manifest_path,
     }
 
     skrmaker_free(procs);
+    state_save();    /* persist updated workload set */
     return submitted;
 }
 
@@ -325,7 +381,7 @@ static void evict_workload(const char* app_name,
                     !strcmp(g_nodes[n].node_id, pl->node_id)) {
                     char cmd[256];
                     snprintf(cmd, sizeof(cmd), "KILL|%.127s", app_name);
-                    fabric_send(send_sock, g_nodes[n].ip, MESH_PORT,
+                    fabric_send(send_sock, g_nodes[n].ip, NODE_CMD_PORT,
                                 cmd, strlen(cmd));
                     break;
                 }
@@ -338,6 +394,7 @@ static void evict_workload(const char* app_name,
 
         pthread_mutex_unlock(&g_nodes_mu);
         pthread_mutex_unlock(&g_workloads_mu);
+        state_save();   /* persist updated workload set */
         return;
     }
 
@@ -432,7 +489,7 @@ static void* rebalancer_thread(void* arg) {
                                    sp->name, nd->cpu_pct, cpu_below);
                             char cmd[256];
                             snprintf(cmd, sizeof(cmd), "KILL|%s", sp->name);
-                            fabric_send(send_sock, nd->ip, MESH_PORT,
+                            fabric_send(send_sock, nd->ip, NODE_CMD_PORT,
                                         cmd, strlen(cmd));
                             pl->active = 0;
                             wl->replica_count--;
@@ -598,6 +655,12 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     pthread_attr_destroy(&attr);
+
+    /* Restore workloads from previous run */
+    {
+        char restore_resp[FABRIC_MTU];
+        state_load(restore_resp, sizeof(restore_resp));
+    }
 
     printf("[sched] Conductor ready — watching for nodes and workloads\n");
 

@@ -12,7 +12,7 @@
 //   skr8tr lookup <service>         — resolve a service name via the Tower
 //   skr8tr ping                     — ping Conductor and Tower
 //
-// All commands speak UDP to the Conductor (7771) or Tower (7772).
+// All commands speak UDP to the Conductor (7771), Tower (7772), or Node (7775).
 // No persistent state. No config file required for local use.
 
 use clap::{Parser, Subcommand};
@@ -73,6 +73,14 @@ enum Commands {
     },
     /// Ping the Conductor and Tower to verify they are reachable
     Ping,
+    /// Tail the stdout/stderr ring buffer of a running app
+    Logs {
+        /// App name to fetch logs from
+        app: String,
+        /// Node host to query directly (auto-resolved from Conductor if omitted)
+        #[arg(long)]
+        node: Option<String>,
+    },
 }
 
 // -------------------------------------------------------------------------
@@ -147,6 +155,38 @@ fn print_list(resp: &str) {
     } else {
         println!("  {resp}");
     }
+}
+
+// -------------------------------------------------------------------------
+// Log helpers — two-step node resolution
+// -------------------------------------------------------------------------
+
+/// Parse OK|LIST|n|app:node:pid,... → find node_id for app
+fn find_node_for_app(resp: &str, app: &str) -> Option<String> {
+    let body = resp.strip_prefix("OK|LIST|")?;
+    let parts: Vec<&str> = body.splitn(2, '|').collect();
+    if parts.len() < 2 { return None; }
+    for entry in parts[1].split(',') {
+        let f: Vec<&str> = entry.splitn(3, ':').collect();
+        if f.len() == 3 && f[0] == app {
+            return Some(f[1].to_string());
+        }
+    }
+    None
+}
+
+/// Parse OK|NODES|n|id:ip:cpu:ram,... → find IP for node_id
+fn find_ip_for_node(resp: &str, node_id: &str) -> Option<String> {
+    let body = resp.strip_prefix("OK|NODES|")?;
+    let parts: Vec<&str> = body.splitn(2, '|').collect();
+    if parts.len() < 2 { return None; }
+    for entry in parts[1].split(',') {
+        let f: Vec<&str> = entry.splitn(4, ':').collect();
+        if f.len() == 4 && f[0] == node_id {
+            return Some(f[1].to_string());
+        }
+    }
+    None
 }
 
 // -------------------------------------------------------------------------
@@ -232,6 +272,63 @@ fn cmd_lookup(cli: &Cli, service: &str) {
     }
 }
 
+fn cmd_logs(cli: &Cli, app: &str, node_override: Option<&str>) {
+    let node_host = if let Some(h) = node_override {
+        h.to_string()
+    } else {
+        /* Step 1: ask Conductor for placement list */
+        let list_resp = match udp_send(&cli.conductor, 7771, "LIST", cli.timeout_ms) {
+            Ok(r)  => r,
+            Err(e) => { println!("  error querying conductor: {e}"); return; }
+        };
+        let node_id = match find_node_for_app(&list_resp, app) {
+            Some(id) => id,
+            None => {
+                println!("  app '{app}' has no active placements");
+                return;
+            }
+        };
+        /* Step 2: resolve node_id → IP */
+        let nodes_resp = match udp_send(&cli.conductor, 7771, "NODES", cli.timeout_ms) {
+            Ok(r)  => r,
+            Err(e) => { println!("  error querying conductor: {e}"); return; }
+        };
+        match find_ip_for_node(&nodes_resp, &node_id) {
+            Some(ip) => ip,
+            None => {
+                println!("  node {node_id} not found in live node table");
+                return;
+            }
+        }
+    };
+
+    /* Step 3: fetch log ring from node (node command port 7775) */
+    match udp_send(&node_host, 7775, &format!("LOGS|{app}"), cli.timeout_ms) {
+        Ok(r) if r.starts_with("OK|LOGS|") => {
+            /* Format: OK|LOGS|<name>|<count>|<lines...> */
+            let parts: Vec<&str> = r.splitn(5, '|').collect();
+            let count = parts.get(3).copied().unwrap_or("0");
+            let body  = parts.get(4).copied().unwrap_or("");
+            println!("  logs for '{app}' on {node_host} ({count} lines captured):");
+            println!("  {}", "-".repeat(64));
+            for line in body.split('\n') {
+                if !line.is_empty() {
+                    println!("  {line}");
+                }
+            }
+        }
+        Ok(r) if r.starts_with("ERR|") => {
+            println!("  {r}");
+            std::process::exit(1);
+        }
+        Ok(r)  => println!("  {r}"),
+        Err(e) => {
+            println!("  error querying node {node_host}: {e}");
+            std::process::exit(1);
+        }
+    }
+}
+
 fn cmd_ping(cli: &Cli) {
     print!("  conductor ({}:7771)... ", cli.conductor);
     match udp_send(&cli.conductor, 7771, "PING", cli.timeout_ms) {
@@ -263,5 +360,6 @@ fn main() {
         Commands::List                => cmd_list(&cli),
         Commands::Lookup { service }  => cmd_lookup(&cli, service),
         Commands::Ping                => cmd_ping(&cli),
+        Commands::Logs { app, node }  => cmd_logs(&cli, app, node.as_deref()),
     }
 }
