@@ -1,23 +1,23 @@
 # SESSION_STATE.md — Skr8tr Sovereign Session Handoff
 ## Branch: main
 ## Date: 2026-04-06
+## Session end: 05:45
 
 ---
 
 ### Last Completed Task
 
-**Phase 10 COMPLETE — Agent Feed Live Integration**
+**Phase 11a COMPLETE — Args Fix + PID Tracking**
 
-`src/cockpit/skr8tr_cockpit.c`:
-- `DEFAULT_PIPE_PATH /tmp/skr8trview.pipe`
-- `--pipe <path>` / `--no-pipe` CLI flags
-- `pipe_reader_thread`: `mkfifo`, blocking open, newline-delimited line reader
-- `broadcast_agent()`: sends `AGENT|...` frames to all authed WS sessions
+All four files patched and verified end-to-end:
+- `src/parser/skrmaker.h` — `char args[512]` added to `SkrProc`
+- `src/parser/skrmaker.c` — `exec` + `args` manifest keys parsed
+- `src/daemon/skr8tr_sched.c` — ephemeral socket for PID capture; `args=` in LAUNCH cmd
+- `src/daemon/skr8tr_node.c` — extract `args=`; full argv build in `launch_proc()`
+- `examples/my-server.skr8tr` — `exec /bin/sleep` + `args 3600` test workload
 
-`ui/index.html`:
-- Agent Feed panel renders live `AGENT|tag|event_str|answer` frames as cards
-- Tag badge (yellow), event string, condensed answer, timestamp
-- Clear button resets counter + feed
+Verified: `OK|LIST|1|my-server:b33c8ed0...:968189` — PID 968189 is `/bin/sleep 3600`
+Workloads panel no longer stuck in "pending" — real PID displayed.
 
 ### Next Task (resume here)
 
@@ -33,13 +33,12 @@ Reproducibility via NixOS flake overlay — pinned gcc, liboqs, rustup, all deps
 
 ### Open Blockers
 
-- Cockpit must be started manually:
+- nix-shell segfaults — use env vars for build:
   ```bash
-  cd /home/sbaker/skr8tr
-  OQS_LIBDIR=$(find /nix/store -name "liboqs.so" 2>/dev/null | head -1 | xargs dirname)
-  LD_LIBRARY_PATH="$OQS_LIBDIR" bin/skr8tr_cockpit --ui ui &
+  OQS_INCDIR=$(find /nix/store -name "oqs.h" | head -1 | xargs dirname | xargs dirname)
+  OQS_LIBDIR=$(find /nix/store -name "liboqs.so" | head -1 | xargs dirname)
+  C_INCLUDE_PATH="$OQS_INCDIR" LIBRARY_PATH="$OQS_LIBDIR" make
   ```
-- nix-shell segfaults — use env vars for build (see Makefile section above)
 
 ### Run Commands
 
@@ -66,7 +65,10 @@ RUST_LOG=info SKRTRVIEW_PIPE=/tmp/skr8trview.pipe \
 
 ### Files Modified This Session
 
-- `src/cockpit/skr8tr_cockpit.c` — pipe reader thread + broadcast_agent
-- `ui/index.html` — Agent Feed live card renderer
-- `MILESTONES.md` — Phase 10 appended
+- `src/parser/skrmaker.h` — args[512] field
+- `src/parser/skrmaker.c` — exec + args key parsing
+- `src/daemon/skr8tr_sched.c` — ephemeral socket PID capture + args= in LAUNCH
+- `src/daemon/skr8tr_node.c` — args= extraction + full argv build
+- `examples/my-server.skr8tr` — NEW: sleep 3600 test workload
+- `MILESTONES.md` — Phase 11a entry appended
 - `SESSION_STATE.md` — this file
