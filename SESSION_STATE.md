@@ -1,104 +1,88 @@
-# SESSION_STATE.md — Skr8tr Session Handoff
-## Branch: feature/sovereign-multiplication-logic
-## Date: 2026-04-05
+# SESSION_STATE.md — Skr8tr Sovereign Session Handoff
+## Branch: main
+## Date: 2026-04-06
 
 ---
 
 ### Last Completed Task
 
-**Phase 6 COMPLETE — VM Orchestration + Production Hardening**
+**Phase 9 COMPLETE — Skr8trView Sovereign Control UI**
 
-All Phase 6 deliverables verified and committed:
+Five files built and pushed:
 
-1. **VM launch** — QEMU argv builder + Firecracker JSON config generator in `skr8tr_node.c`
-2. **Log capture** — per-process pipe → `LogRing` ring buffer (200×256); `LOGS|<app>` command
-3. **Health check enforcement** — HTTP GET probe in heartbeat thread; kill on repeated failure  
-4. **Tower auto-registration** — REGISTER on launch, DEREGISTER on kill
-5. **Persistent Conductor state** — `state_save()` / `state_load()` with `/tmp/skr8tr_conductor.state`
-6. **CLI `logs` command** — two-step node resolution (LIST → NODES → LOGS:7775)
-7. **Dual-socket node** — port 7770 mesh + port 7775 dedicated command port (fixes port contention)
-8. **`examples/vm-workload.skr8tr`** — Firecracker microVM manifest example
+1. `src/cockpit/skrtrpass.h` — ML-DSA-65 SkrtrPass: token format, verify, mint
+2. `src/cockpit/skr8tr_cockpit.c` — C23 WebSocket cockpit, port 7780
+   - RFC 6455 WebSocket (pure C, no deps), SkrtrPass auth gate
+   - Routes WS → UDP to Conductor (7771/7775) + Tower (7772)
+   - Push thread: live NODES + LIST every 5s to all authed sessions
+   - HTTP static server on same port for `ui/`
+3. `src/cockpit/gen_skrtrpass.c` — keygen / mint / verify CLI
+4. `ui/index.html` — sovereign dark-theme SPA: Cluster, Workloads, Services, Logs, Agent Feed
+5. `Makefile` — updated with cockpit + gen_skrtrpass targets
 
-Integration test all-green:
-  skr8tr ping  → conductor ok, tower ok
-  skr8tr nodes → live node table
-  skr8tr up    → submitted, state persisted
-  skr8tr list  → replicas listed
-  skr8tr logs  → end-to-end 0-line capture (no-output binary — correct)
-  skr8tr down  → evicted, state cleared
-  skr8tr status → 0 replicas
+Build: zero warnings, zero errors (`-std=gnu23 -Wall -Wextra`)
+Pushed: Gitea main → e7e4328
 
 ### Next Task (resume here)
 
-**Phase 7 — Choose one:**
+**Phase 10 — Agent Feed Live Integration**
 
-Option A: NixOS overlay + commercial packaging
-  - `shell.nix` upgrade: pin all deps (gcc, liboqs, rustup) in a Nix flake overlay
-  - Ensures reproducible builds — same binary every time, every machine
-  - Required for commercial distribution ($19.99/site/month license)
-  - Discussion: Captain raised $19.99/site/month closed-source model — see Notes below
+Wire skr8tr-agent output into the Skr8trView Agent Feed panel in real time:
 
-Option B: TLS on Tower
-  - Encrypt Tower registration/lookup with TLS (or PQC KEM key exchange)
-  - Prevents rogue nodes from hijacking service registry
-  - Low-cost hardening for production trust
+1. Add a named pipe or Unix socket to `skr8tr_cockpit.c` that skr8tr-agent can write events to
+2. The cockpit's push thread reads from the pipe and broadcasts `AGENT|<event_json>` frames to all authed WS sessions
+3. Update `ui/index.html` Agent Feed panel to render incoming `AGENT|` frames with event tag + recommendation text
+4. Update `crates/skr8tr-agent/src/reasoner.rs` to additionally write each `Recommendation` to the cockpit pipe
 
-Option C: Multi-node test on real hardware
-  - Provision two VMs / physical machines
-  - Deploy Skr8tr on both, verify cross-machine heartbeat + LAUNCH routing
-  - Confirm elastic scale-up across real network
-
-Recommend: Option A (NixOS overlay) — unlocks the commercial distribution path Captain discussed.
+**Start Phase 10 by:**
+1. Reading `src/cockpit/skr8tr_cockpit.c` push_thread (around line 660)
+2. Reading `crates/skr8tr-agent/src/reasoner.rs` `display()` method
+3. Adding `--pipe /tmp/skr8trview.pipe` flag to both cockpit and skr8tr-agent
 
 ### Open Blockers
-- None — all Phase 6 items complete
-- Port 7770 shared between conductor (mesh receive) and node (heartbeat send) is
-  resolved by the dual-socket design (7775 for commands). Cross-machine deployment
-  has no conflict since conductor and nodes run on separate hosts.
 
-### Files Modified This Session
-- `src/parser/skrmaker.h`    (SkrtrVM struct, SKRTR_TYPE_VM)
-- `src/parser/skrmaker.c`    (parse_vm, type vm)
-- `src/daemon/skr8tr_node.c` (Phase 6 full rewrite — 960+ lines)
-- `src/daemon/skr8tr_sched.c`(persistent state: state_save/state_load/manifest_path)
-- `cli/src/main.rs`          (logs command, port 7775 for node queries)
-- `examples/vm-workload.skr8tr` (NEW)
-- `MILESTONES.md`
-- `SESSION_STATE.md`
+- nix-shell segfaults — build by setting env vars manually:
+  ```bash
+  OQS_INCDIR=$(find /nix/store -name "oqs.h" 2>/dev/null | head -1 | xargs dirname | xargs dirname)
+  OQS_LIBDIR=$(find /nix/store -name "liboqs.so" 2>/dev/null | head -1 | xargs dirname)
+  C_INCLUDE_PATH="$OQS_INCDIR" LIBRARY_PATH="$OQS_LIBDIR" make
+  ```
+- CUDA EP still missing `libcublasLt.so.13` — gte-large runs on CPU (~7s/query, acceptable)
+- llama-server must be started manually before `skr8tr-agent watch`
 
-### Build Commands
+### Run Commands
+
 ```bash
-# C23 daemons (from /home/sbaker/skr8tr):
-gcc -std=gnu23 -Wall -Wextra -O2 \
-  -I./src/core -I./src/parser \
-  -I/nix/store/ivgra1x5vxd2frx380l5lbnycifr6fvm-liboqs-0.15.0-dev/include \
-  src/daemon/skr8tr_node.c src/core/fabric.c src/parser/skrmaker.c \
-  -o bin/skr8tr_node \
-  -L/nix/store/l8p18zsf1jaivqfs14q0aq1dvb3cqr7a-liboqs-0.15.0/lib -loqs -lpthread
+# Build cockpit + token tool (from /home/sbaker/skr8tr):
+OQS_INCDIR=$(find /nix/store -name "oqs.h" 2>/dev/null | head -1 | xargs dirname | xargs dirname)
+OQS_LIBDIR=$(find /nix/store -name "liboqs.so" 2>/dev/null | head -1 | xargs dirname)
+C_INCLUDE_PATH="$OQS_INCDIR" LIBRARY_PATH="$OQS_LIBDIR" make bin/skr8tr_cockpit bin/gen_skrtrpass
 
-gcc -std=gnu23 -Wall -Wextra -O2 \
-  -I./src/core -I./src/parser \
-  -I/nix/store/ivgra1x5vxd2frx380l5lbnycifr6fvm-liboqs-0.15.0-dev/include \
-  src/daemon/skr8tr_sched.c src/core/fabric.c src/parser/skrmaker.c \
-  -o bin/skr8tr_sched \
-  -L/nix/store/l8p18zsf1jaivqfs14q0aq1dvb3cqr7a-liboqs-0.15.0/lib -loqs -lpthread
+# Generate keypair (one-time):
+bin/gen_skrtrpass keygen
 
-gcc -std=gnu23 -Wall -Wextra -O2 -I./src/core \
-  src/daemon/skr8tr_reg.c src/core/fabric.c -o bin/skr8tr_reg -lpthread
+# Mint admin token (30 days):
+bin/gen_skrtrpass mint --role admin --user captain --ttl 2592000 --key skrtrview.sec
 
-gcc -std=gnu23 -Wall -Wextra -O2 -I./src/core \
-  src/server/skr8tr_serve.c -o bin/skr8tr_serve -lpthread
+# Dev mode (no keypair needed) — start cockpit, click Connect with empty token:
+nohup bin/skr8tr_cockpit --ui ./ui > /tmp/cockpit.log 2>&1 &
+# → http://127.0.0.1:7780/
 
-# Rust CLI:
-cd cli && RUSTC=~/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc \
-  ~/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo build --release
+# Production mode:
+nohup bin/skr8tr_cockpit --ui ./ui --pubkey ./skrtrview.pub > /tmp/cockpit.log 2>&1 &
+
+# Skr8tr daemons:
+nohup bin/skr8tr_node  > /tmp/sk_node.log  2>&1 &
+nohup bin/skr8tr_sched > /tmp/sk_sched.log 2>&1 &
+nohup bin/skr8tr_reg   > /tmp/sk_reg.log   2>&1 &
 ```
 
-### Notes
-- Captain asked about closed-source commercial model: $19.99/site/month, no open source
-- Feasibility: YES — Skr8tr has no viral GPL deps (liboqs is MIT, all C/Rust stdlib)
-- Captain wants NixOS overlay to lock build reproducibility for commercial distribution
-- NixOS overlay = `flake.nix` that pins every dep hash — same binary guaranteed on any NixOS host
-- Distribution model: customers download binary + activate with license key
-  - License key server is minimal (just validates key, no telemetry)
-  - Or simpler: offline license (signed with ML-DSA-65 private key — very sovereign)
+### Files Modified This Session
+
+- `src/cockpit/skrtrpass.h` — NEW
+- `src/cockpit/skr8tr_cockpit.c` — NEW
+- `src/cockpit/gen_skrtrpass.c` — NEW
+- `ui/index.html` — NEW
+- `Makefile` — updated
+- `MILESTONES.md` — Phase 9 appended
+- `SESSION_STATE.md` — this file
