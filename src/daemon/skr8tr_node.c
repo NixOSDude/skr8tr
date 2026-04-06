@@ -534,9 +534,28 @@ static pid_t launch_proc(const SkrProc* lp, char* err, size_t err_len) {
             return -1;
         }
 
-        char* argv_simple[] = { (char*)bin, NULL };
-        char** argv_exec    = (lp->serve.is_static && !lp->bin[0])
-                            ? serve_argv : argv_simple;
+        /* Build argv from bin + space-separated args field */
+        static char  args_copy[512];
+        static char* argv_with_args[64];
+        char** argv_exec;
+        if (lp->serve.is_static && !lp->bin[0]) {
+            argv_exec = serve_argv;
+        } else if (lp->args[0]) {
+            snprintf(args_copy, sizeof(args_copy), "%s", lp->args);
+            int ai2 = 0;
+            argv_with_args[ai2++] = (char*)bin;
+            char* tok = strtok(args_copy, " ");
+            while (tok && ai2 < 62) {
+                argv_with_args[ai2++] = tok;
+                tok = strtok(NULL, " ");
+            }
+            argv_with_args[ai2] = NULL;
+            argv_exec = argv_with_args;
+        } else {
+            static char* argv_simple[] = { NULL, NULL };
+            argv_simple[0] = (char*)bin;
+            argv_exec = argv_simple;
+        }
 
         /* Build env array */
         char** injected_env = NULL; int injected_count = 0;
@@ -736,9 +755,11 @@ static void handle_command(const char* cmd, size_t cmd_len,
                       if(_l>=(olen)){_l=(olen)-1;} memcpy((out),_p,_l); (out)[_l]='\0'; } \
         } while(0)
 
+        char args_s[512] = {0};
         FE(cmd+7,"name=",name, sizeof(name));
         FE(cmd+7,"bin=", bin,  sizeof(bin));
         FE(cmd+7,"port=",port_s,sizeof(port_s));
+        FE(cmd+7,"args=",args_s,sizeof(args_s));
         FE(cmd+7,"env=", env_s, sizeof(env_s));
         #undef FE
 
@@ -749,6 +770,7 @@ static void handle_command(const char* cmd, size_t cmd_len,
         SkrProc lp = {0};
         snprintf(lp.name, sizeof(lp.name), "%s", name);
         snprintf(lp.bin,  sizeof(lp.bin),  "%s", bin);
+        snprintf(lp.args, sizeof(lp.args), "%s", args_s);
         lp.port          = port_s[0] ? (int)strtol(port_s, NULL, 10) : 0;
         lp.workload_type = SKRTR_TYPE_SERVICE;
 

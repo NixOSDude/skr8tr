@@ -248,30 +248,66 @@ static int launch_replica(Workload* wl, NodeEntry* node) {
     }
 
     char cmd[FABRIC_MTU];
-    if (env_str[0])
+    if (env_str[0] && sp->args[0])
+        snprintf(cmd, sizeof(cmd), "LAUNCH|name=%s|bin=%s|port=%d|args=%s|env=%s",
+                 sp->name, sp->bin, sp->port, sp->args, env_str);
+    else if (sp->args[0])
+        snprintf(cmd, sizeof(cmd), "LAUNCH|name=%s|bin=%s|port=%d|args=%s",
+                 sp->name, sp->bin, sp->port, sp->args);
+    else if (env_str[0])
         snprintf(cmd, sizeof(cmd), "LAUNCH|name=%s|bin=%s|port=%d|env=%s",
                  sp->name, sp->bin, sp->port, env_str);
     else
         snprintf(cmd, sizeof(cmd), "LAUNCH|name=%s|bin=%s|port=%d",
                  sp->name, sp->bin, sp->port);
 
-    if (fabric_send(send_sock, node->ip, NODE_CMD_PORT, cmd, strlen(cmd)) < 0) {
-        fprintf(stderr, "[sched] send LAUNCH to %s failed: %s\n",
-                node->ip, strerror(errno));
+    /* Use a dedicated ephemeral socket for the LAUNCH round-trip so we can
+     * read the OK|LAUNCHED|name|pid reply without touching the main cmd_sock. */
+    int lsock = fabric_bind(0);
+    if (lsock < 0) {
+        fprintf(stderr, "[sched] launch_replica: cannot create socket: %s\n",
+                strerror(errno));
         return 0;
     }
 
-    /* Optimistically record the placement — node will confirm via STATUS */
+    struct timeval tv = { .tv_sec = 3, .tv_usec = 0 };
+    setsockopt(lsock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+    if (fabric_send(lsock, node->ip, NODE_CMD_PORT, cmd, strlen(cmd)) < 0) {
+        fprintf(stderr, "[sched] send LAUNCH to %s failed: %s\n",
+                node->ip, strerror(errno));
+        close(lsock);
+        return 0;
+    }
+
+    /* Read the node's LAUNCHED reply to capture the real PID */
+    char reply[256] = {0};
+    int  rn = fabric_recv(lsock, reply, sizeof(reply) - 1, NULL);
+    close(lsock);
+
+    pid_t real_pid = 0;
+    if (rn > 0) {
+        reply[rn] = '\0';
+        /* Format: OK|LAUNCHED|<name>|<pid> */
+        const char* pid_field = NULL;
+        int pipes = 0;
+        for (int i = 0; i < rn; i++) {
+            if (reply[i] == '|' && ++pipes == 3) { pid_field = reply + i + 1; break; }
+        }
+        if (pid_field) real_pid = (pid_t)strtol(pid_field, NULL, 10);
+    }
+
+    /* Record the placement with the real PID */
     Placement* pl = placement_alloc(wl);
     if (!pl) { fprintf(stderr, "[sched] placement table full\n"); return 0; }
     snprintf(pl->app_name, sizeof(pl->app_name), "%s", sp->name);
     snprintf(pl->node_id,  sizeof(pl->node_id),  "%s", node->node_id);
-    pl->pid    = 0;     /* pid known after first STATUS response */
+    pl->pid    = (int)real_pid;
     pl->active = 1;
     wl->replica_count++;
 
-    printf("[sched] launched replica: %s → node %s (%s)\n",
-           sp->name, node->node_id, node->ip);
+    printf("[sched] launched replica: %s → node %s (%s) pid=%d\n",
+           sp->name, node->node_id, node->ip, (int)real_pid);
     return 1;
 }
 

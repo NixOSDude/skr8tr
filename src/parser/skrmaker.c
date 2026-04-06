@@ -300,7 +300,9 @@ static int parse_app(Parser* p, SkrProc* proc) {
         else if (!strcmp(key, "replicas")) proc->replicas  = (int)strtol(val, NULL, 10);
         else if (!strcmp(key, "ram"))      proc->ram_bytes = parse_ram(val);
         else if (!strcmp(key, "cpu"))      proc->cpu_cores = (int)strtol(val, NULL, 10);
-        else if (!strcmp(key, "bin"))      strncpy(proc->bin, val, sizeof(proc->bin) - 1);
+        else if (!strcmp(key, "bin"))      strncpy(proc->bin,  val, sizeof(proc->bin)  - 1);
+        else if (!strcmp(key, "exec"))     strncpy(proc->bin,  val, sizeof(proc->bin)  - 1);
+        else if (!strcmp(key, "args"))     strncpy(proc->args, val, sizeof(proc->args) - 1);
         else if (!strcmp(key, "type")) {
             if      (!strcmp(val, "job"))     proc->workload_type = SKRTR_TYPE_JOB;
             else if (!strcmp(val, "service")) proc->workload_type = SKRTR_TYPE_SERVICE;

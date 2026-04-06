@@ -101,6 +101,7 @@ typedef struct SkrProc {
 
     /* process */
     char               bin[SKRMAKER_PATH_LEN];
+    char               args[512];         /* space-separated argv[1..] */
 
     /* resources */
     int                port;
