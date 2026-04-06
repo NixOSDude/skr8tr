@@ -262,3 +262,38 @@ Phase 10: Agent Feed live integration — pipe skr8tr-agent events into Skr8trVi
 - Skr8trView fully operational: `http://127.0.0.1:7780/`
 - Dev mode confirmed: empty token → AUTH_OK|admin
 - All 5 panels loading (Cluster/Workloads/Services/Logs/Agent Feed)
+
+---
+
+## [2026-04-06] main — Phase 10: Agent Feed Live Integration
+
+### What Was Built
+Full pipe from skr8tr-agent (Mistral-Nemo recommendations) → Skr8trView Agent Feed panel.
+
+**Wire:**
+```
+skr8tr-agent watch
+  → detects anomaly (NodeLost, ReplicaDrop, HighCpu…)
+  → RAG query against Skr8tr codebase (gte-large-en-v1.5, HNSW)
+  → Mistral-Nemo generates grounded recommendation
+  → pipe_emit() writes AGENT|tag|event_str|answer to /tmp/skr8trview.pipe
+  → skr8tr_cockpit pipe_reader_thread reads line
+  → broadcast_agent() sends WS frame to all authed sessions
+  → ui/index.html renderAgentEvent() renders card in Agent Feed panel
+```
+
+### Run (full stack)
+```bash
+# Skr8tr daemons + cockpit (from /home/sbaker/skr8tr):
+OQS_LIBDIR=$(find /nix/store -name "liboqs.so" 2>/dev/null | head -1 | xargs dirname)
+nohup bin/skr8tr_sched > /tmp/sk_sched.log 2>&1 &
+nohup bin/skr8tr_node  > /tmp/sk_node.log  2>&1 &
+LD_LIBRARY_PATH="$OQS_LIBDIR" nohup bin/skr8tr_cockpit --ui ui > /tmp/cockpit.log 2>&1 &
+
+# skr8tr-agent with pipe (from /home/sbaker/RusticAgentic):
+RUST_LOG=info SKRTRVIEW_PIPE=/tmp/skr8trview.pipe \
+  nohup ./target/release/skr8tr-agent watch --interval-s 30 --index vault/skr8tr-index &
+```
+
+### Next Milestone
+Phase 11: NixOS flake overlay for reproducible commercial builds
