@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skr8trView — Sovereign Mesh Control</title>
+<style>
+  /* -----------------------------------------------------------------------
+   * Skr8trView — Sovereign dark-theme control UI
+   * No framework. No npm. No build step. Pure DOM + WebSocket.
+   * ----------------------------------------------------------------------- */
+
+  :root {
+    --bg:        #0d1117;
+    --panel:     #161b22;
+    --border:    #30363d;
+    --accent:    #58a6ff;
+    --green:     #3fb950;
+    --yellow:    #d29922;
+    --red:       #f85149;
+    --muted:     #8b949e;
+    --text:      #e6edf3;
+    --mono:      'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 14px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ---- Login overlay ---- */
+  #login-overlay {
+    position: fixed; inset: 0;
+    background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+  }
+  #login-box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 40px 48px;
+    width: 560px;
+    display: flex; flex-direction: column; gap: 20px;
+  }
+  #login-box h1 {
+    font-size: 22px; font-weight: 700;
+    color: var(--accent); letter-spacing: 0.5px;
+  }
+  #login-box p { color: var(--muted); font-size: 13px; }
+  #token-input {
+    background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); border-radius: 6px;
+    padding: 10px 12px; font-family: var(--mono); font-size: 12px;
+    resize: vertical; min-height: 120px; width: 100%;
+  }
+  #token-input:focus { outline: none; border-color: var(--accent); }
+  #login-btn {
+    background: var(--accent); color: #0d1117;
+    border: none; border-radius: 6px;
+    padding: 10px 0; font-size: 14px; font-weight: 700;
+    cursor: pointer; width: 100%;
+    transition: opacity .15s;
+  }
+  #login-btn:hover { opacity: 0.88; }
+  #login-err { color: var(--red); font-size: 13px; min-height: 18px; }
+  #dev-hint {
+    color: var(--muted); font-size: 12px; text-align: center;
+    margin-top: -8px;
+  }
+
+  /* ---- Top bar ---- */
+  #topbar {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 0 20px;
+    height: 48px;
+    display: flex; align-items: center; gap: 16px;
+    flex-shrink: 0;
+  }
+  #topbar .logo {
+    font-family: var(--mono); font-size: 15px; font-weight: 700;
+    color: var(--accent); letter-spacing: 1px;
+  }
+  #conn-badge {
+    font-size: 12px; padding: 2px 8px; border-radius: 4px;
+    background: var(--red); color: #fff; font-weight: 700;
+  }
+  #conn-badge.connected { background: var(--green); }
+  #role-badge {
+    font-size: 12px; padding: 2px 8px; border-radius: 4px;
+    background: #21262d; color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  #role-badge.admin { color: var(--yellow); border-color: var(--yellow); }
+  #role-badge.operator { color: var(--green); border-color: var(--green); }
+  .spacer { flex: 1; }
+  #push-status { color: var(--muted); font-size: 12px; }
+
+  /* ---- Tab nav ---- */
+  #tabs {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    display: flex; padding: 0 20px;
+    flex-shrink: 0;
+  }
+  .tab {
+    padding: 10px 18px; font-size: 13px; font-weight: 600;
+    color: var(--muted); cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color .15s, border-color .15s;
+    user-select: none;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ---- Main panels ---- */
+  #panels { flex: 1; overflow: hidden; }
+  .panel { display: none; height: 100%; overflow-y: auto; padding: 20px; }
+  .panel.active { display: block; }
+
+  /* ---- Section headings ---- */
+  .section-hd {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 14px;
+  }
+  .section-hd h2 { font-size: 15px; font-weight: 700; }
+  .section-hd .count {
+    background: #21262d; border: 1px solid var(--border);
+    border-radius: 10px; padding: 1px 8px;
+    font-size: 12px; color: var(--muted);
+  }
+  .refresh-btn {
+    margin-left: auto; background: #21262d;
+    border: 1px solid var(--border); color: var(--text);
+    border-radius: 6px; padding: 4px 12px; cursor: pointer;
+    font-size: 12px; transition: background .15s;
+  }
+  .refresh-btn:hover { background: #30363d; }
+
+  /* ---- Data tables ---- */
+  table {
+    width: 100%; border-collapse: collapse;
+    font-size: 13px; font-family: var(--mono);
+  }
+  thead th {
+    text-align: left; padding: 8px 12px;
+    color: var(--muted); font-weight: 600; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+  }
+  tbody tr { border-bottom: 1px solid #21262d; }
+  tbody tr:hover { background: #161b22; }
+  tbody td { padding: 9px 12px; vertical-align: middle; }
+  .cell-id { color: var(--muted); font-size: 11px; }
+
+  /* ---- Status badges ---- */
+  .badge {
+    display: inline-block; padding: 2px 7px; border-radius: 4px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.3px;
+  }
+  .badge-ok  { background: #0d4a1f; color: var(--green); }
+  .badge-warn { background: #3d2e00; color: var(--yellow); }
+  .badge-err { background: #4a0d0d; color: var(--red); }
+  .badge-pending { background: #21262d; color: var(--muted); }
+
+  /* ---- CPU meter ---- */
+  .cpu-bar { display: flex; align-items: center; gap: 8px; }
+  .cpu-track {
+    width: 80px; height: 6px; background: #21262d;
+    border-radius: 3px; overflow: hidden;
+  }
+  .cpu-fill { height: 100%; border-radius: 3px; transition: width .4s; }
+
+  /* ---- Action buttons ---- */
+  .action-btn {
+    background: transparent; border: 1px solid var(--border);
+    color: var(--muted); border-radius: 4px;
+    padding: 3px 9px; cursor: pointer; font-size: 11px;
+    transition: all .15s;
+  }
+  .action-btn:hover { background: var(--red); color: #fff; border-color: var(--red); }
+  .action-btn:disabled { opacity: 0.35; cursor: default; }
+
+  /* ---- Logs panel ---- */
+  #log-selector {
+    display: flex; gap: 10px; margin-bottom: 14px; align-items: center;
+  }
+  #log-app-select {
+    background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); border-radius: 6px; padding: 6px 10px;
+    font-size: 13px; min-width: 200px;
+  }
+  #log-fetch-btn {
+    background: var(--accent); color: #0d1117;
+    border: none; border-radius: 6px; padding: 6px 16px;
+    font-weight: 700; cursor: pointer; font-size: 13px;
+  }
+  #log-output {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 6px; padding: 14px 16px;
+    font-family: var(--mono); font-size: 12px;
+    line-height: 1.6; color: #cdd9e5;
+    white-space: pre-wrap; min-height: 300px;
+    max-height: calc(100vh - 260px); overflow-y: auto;
+  }
+
+  /* ---- Submit manifest ---- */
+  #submit-section {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 20px; margin-top: 16px;
+  }
+  #submit-section h3 { margin-bottom: 12px; font-size: 14px; }
+  #manifest-path {
+    background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); border-radius: 6px; padding: 8px 12px;
+    font-family: var(--mono); font-size: 13px; width: 100%;
+    margin-bottom: 10px;
+  }
+  #manifest-path:focus { outline: none; border-color: var(--accent); }
+  #submit-btn {
+    background: var(--green); color: #0d1117;
+    border: none; border-radius: 6px; padding: 8px 20px;
+    font-weight: 700; cursor: pointer; font-size: 13px;
+  }
+  #submit-result {
+    margin-top: 10px; font-size: 13px; color: var(--muted);
+    font-family: var(--mono); min-height: 18px;
+  }
+
+  /* ---- Agent feed ---- */
+  #agent-feed {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 6px; padding: 14px 16px;
+    font-family: var(--mono); font-size: 12px;
+    line-height: 1.7; color: #cdd9e5;
+    white-space: pre-wrap;
+    min-height: 200px; max-height: calc(100vh - 200px); overflow-y: auto;
+  }
+  .agent-event { color: var(--yellow); font-weight: 700; }
+  .agent-answer { color: var(--text); }
+  .agent-sep { color: var(--border); }
+
+  /* ---- Empty state ---- */
+  .empty { text-align: center; padding: 60px 0; color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<!-- =====================================================================
+     LOGIN OVERLAY
+     ===================================================================== -->
+<div id="login-overlay">
+  <div id="login-box">
+    <h1>Skr8trView</h1>
+    <p>Paste your SkrtrPass token to connect. Leave blank in dev mode (no pubkey file).</p>
+    <textarea id="token-input" placeholder="operator|captain|1777777777|4a2f...hex token..."></textarea>
+    <div id="login-err"></div>
+    <button id="login-btn" onclick="doLogin()">Connect</button>
+    <div id="dev-hint">Dev mode: click Connect with empty token field</div>
+  </div>
+</div>
+
+<!-- =====================================================================
+     TOP BAR
+     ===================================================================== -->
+<div id="topbar">
+  <span class="logo">&#x25B8; Skr8trView</span>
+  <span id="conn-badge">OFFLINE</span>
+  <span id="role-badge">—</span>
+  <span class="spacer"></span>
+  <span id="push-status"></span>
+</div>
+
+<!-- =====================================================================
+     TAB NAVIGATION
+     ===================================================================== -->
+<div id="tabs">
+  <div class="tab active" data-panel="cluster"   onclick="showTab(this)">Cluster</div>
+  <div class="tab"        data-panel="workloads" onclick="showTab(this)">Workloads</div>
+  <div class="tab"        data-panel="services"  onclick="showTab(this)">Services</div>
+  <div class="tab"        data-panel="logs"      onclick="showTab(this)">Logs</div>
+  <div class="tab"        data-panel="agent"     onclick="showTab(this)">Agent Feed</div>
+</div>
+
+<!-- =====================================================================
+     PANELS
+     ===================================================================== -->
+<div id="panels">
+
+  <!-- CLUSTER -->
+  <div id="panel-cluster" class="panel active">
+    <div class="section-hd">
+      <h2>Cluster Nodes</h2>
+      <span id="node-count" class="count">0</span>
+      <button class="refresh-btn" onclick="reqNodes()">Refresh</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Node ID</th>
+          <th>IP Address</th>
+          <th>CPU</th>
+          <th>RAM (MB)</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="node-table-body">
+        <tr><td colspan="5" class="empty">Connect and authenticate to view cluster state</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- WORKLOADS -->
+  <div id="panel-workloads" class="panel">
+    <div class="section-hd">
+      <h2>Workloads</h2>
+      <span id="workload-count" class="count">0</span>
+      <button class="refresh-btn" onclick="reqList()">Refresh</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>App</th>
+          <th>Node</th>
+          <th>PID</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="workload-table-body">
+        <tr><td colspan="5" class="empty">No workload data</td></tr>
+      </tbody>
+    </table>
+    <!-- Admin: submit manifest -->
+    <div id="submit-section" style="display:none">
+      <h3>Submit Manifest</h3>
+      <input id="manifest-path" type="text"
+             placeholder="/home/sbaker/skr8tr/examples/react-app.skr8tr">
+      <button id="submit-btn" onclick="submitManifest()">Submit</button>
+      <div id="submit-result"></div>
+    </div>
+  </div>
+
+  <!-- SERVICES -->
+  <div id="panel-services" class="panel">
+    <div class="section-hd">
+      <h2>Service Registry</h2>
+      <span id="service-count" class="count">0</span>
+      <button class="refresh-btn" onclick="reqServices()">Refresh</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Service Name</th>
+          <th>Address</th>
+          <th>TTL</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="service-table-body">
+        <tr><td colspan="4" class="empty">No service data</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- LOGS -->
+  <div id="panel-logs" class="panel">
+    <div class="section-hd">
+      <h2>Node Logs</h2>
+    </div>
+    <div id="log-selector">
+      <select id="log-app-select"><option value="">-- select app --</option></select>
+      <button id="log-fetch-btn" onclick="fetchLogs()">Fetch Logs</button>
+    </div>
+    <div id="log-output">Select an app and click Fetch Logs.</div>
+  </div>
+
+  <!-- AGENT FEED -->
+  <div id="panel-agent" class="panel">
+    <div class="section-hd">
+      <h2>Agent Feed</h2>
+      <span class="count" style="font-size:11px;color:var(--muted)">skr8tr-agent events &amp; Mistral-Nemo recommendations</span>
+      <button class="refresh-btn" onclick="clearAgent()">Clear</button>
+    </div>
+    <div id="agent-feed">Waiting for agent events…
+
+Connect skr8tr-agent in watch mode to populate this feed.
+Events and Mistral-Nemo recommendations will appear here in real-time.
+
+To start the agent:
+  RUST_LOG=info ./target/release/skr8tr-agent watch \
+    --interval-s 30 --index vault/skr8tr-index
+</div>
+  </div>
+
+</div><!-- /panels -->
+
+<!-- =====================================================================
+     JAVASCRIPT
+     ===================================================================== -->
+<script>
+'use strict';
+
+/* -----------------------------------------------------------------------
+ * State
+ * --------------------------------------------------------------------- */
+let ws        = null;
+let userRole  = null;
+let lastPush  = null;
+let apps      = new Set();
+
+/* -----------------------------------------------------------------------
+ * Login
+ * --------------------------------------------------------------------- */
+function doLogin() {
+  const token  = document.getElementById('token-input').value.trim();
+  const errEl  = document.getElementById('login-err');
+  errEl.textContent = '';
+
+  const host = location.hostname || '127.0.0.1';
+  const port = location.port || '7780';
+
+  try {
+    ws = new WebSocket(`ws://${host}:${port}/ws`);
+  } catch (e) {
+    errEl.textContent = 'WebSocket error: ' + e.message;
+    return;
+  }
+
+  ws.onopen = () => {
+    ws.send('AUTH|' + token);
+  };
+
+  ws.onmessage = (ev) => {
+    handleMessage(ev.data);
+  };
+
+  ws.onerror = () => {
+    errEl.textContent = 'Connection failed — is the cockpit running?';
+    setConnected(false);
+  };
+
+  ws.onclose = () => {
+    setConnected(false);
+  };
+}
+
+/* -----------------------------------------------------------------------
+ * Message router
+ * --------------------------------------------------------------------- */
+function handleMessage(raw) {
+  if (raw.startsWith('AUTH_OK|')) {
+    const role = raw.split('|')[1];
+    userRole = role;
+    onAuthSuccess(role);
+    return;
+  }
+
+  if (raw.startsWith('AUTH_ERR|')) {
+    const reason = raw.split('|').slice(1).join('|');
+    document.getElementById('login-err').textContent = 'Auth failed: ' + reason;
+    ws.close();
+    return;
+  }
+
+  if (raw.startsWith('PUSH|')) {
+    handlePush(raw.slice(5));
+    lastPush = new Date();
+    document.getElementById('push-status').textContent =
+      'Live  ·  updated ' + lastPush.toLocaleTimeString();
+    return;
+  }
+
+  if (raw.startsWith('OK|NODES|') || raw.startsWith('OK|STATUS|')) {
+    renderNodes(raw); return;
+  }
+  if (raw.startsWith('OK|LIST|')) {
+    renderWorkloads(raw); return;
+  }
+  if (raw.startsWith('OK|SERVICES|') || raw.startsWith('OK|LIST|')) {
+    /* tower LIST has same prefix as conductor LIST — distinguish by context */
+    return;
+  }
+  if (raw.startsWith('LOGS|')) {
+    const parts = raw.split('|');
+    const logText = parts.slice(2).join('|');
+    document.getElementById('log-output').textContent =
+      logText || '(no log output)';
+    return;
+  }
+  if (raw.startsWith('OK|SUBMIT|') || raw.startsWith('OK|EVICT|')) {
+    document.getElementById('submit-result').textContent = raw;
+    return;
+  }
+  if (raw === 'PONG') return;
+  if (raw.startsWith('ERR|')) {
+    console.warn('[skr8trview] server error:', raw);
+    return;
+  }
+}
+
+function handlePush(payload) {
+  if (payload.startsWith('OK|NODES|') || payload.startsWith('OK|STATUS|')) {
+    renderNodes(payload);
+  } else if (payload.startsWith('OK|LIST|')) {
+    renderWorkloads(payload);
+  }
+}
+
+/* -----------------------------------------------------------------------
+ * Auth success
+ * --------------------------------------------------------------------- */
+function onAuthSuccess(role) {
+  document.getElementById('login-overlay').style.display = 'none';
+  setConnected(true);
+
+  const roleBadge = document.getElementById('role-badge');
+  roleBadge.textContent = role.toUpperCase();
+  roleBadge.className = 'role-badge ' + role;  // admin | operator
+
+  /* Show submit section for admins */
+  if (role === 'admin') {
+    document.getElementById('submit-section').style.display = 'block';
+  }
+
+  /* Initial data pull */
+  reqNodes();
+  reqList();
+  reqServices();
+
+  /* Heartbeat every 30s */
+  setInterval(() => { if (ws && ws.readyState === 1) ws.send('PING'); }, 30000);
+}
+
+function setConnected(val) {
+  const badge = document.getElementById('conn-badge');
+  badge.textContent = val ? 'LIVE' : 'OFFLINE';
+  badge.className   = val ? 'connected' : '';
+  if (!val) document.getElementById('push-status').textContent = '';
+}
+
+/* -----------------------------------------------------------------------
+ * Requests
+ * --------------------------------------------------------------------- */
+function send(cmd) { if (ws && ws.readyState === 1) ws.send(cmd); }
+function reqNodes()    { send('NODES'); }
+function reqList()     { send('LIST'); }
+function reqServices() { send('SERVICES'); }
+
+/* -----------------------------------------------------------------------
+ * Render nodes
+ * Format: OK|NODES|n|id:ip:cpu:ram,id:ip:cpu:ram,...
+ * --------------------------------------------------------------------- */
+function renderNodes(raw) {
+  const parts = raw.split('|');
+  if (parts.length < 4) return;
+  const entries = parts[3] ? parts[3].split(',') : [];
+  const tbody = document.getElementById('node-table-body');
+  document.getElementById('node-count').textContent = entries.length;
+
+  if (!entries.length || !entries[0]) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">No nodes registered</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = entries.map(e => {
+    const [id, ip, cpu, ram] = e.split(':');
+    if (!id) return '';
+    const cpuN   = parseInt(cpu || '0', 10);
+    const cpuCol = cpuN > 80 ? '#f85149' : cpuN > 60 ? '#d29922' : '#3fb950';
+    const short  = id.length > 8 ? id.slice(0, 8) + '…' : id;
+    return `<tr>
+      <td><span class="cell-id" title="${id}">${short}</span></td>
+      <td>${ip || '—'}</td>
+      <td>
+        <div class="cpu-bar">
+          <div class="cpu-track">
+            <div class="cpu-fill" style="width:${cpuN}%;background:${cpuCol}"></div>
+          </div>
+          ${cpuN}%
+        </div>
+      </td>
+      <td>${ram || '—'}</td>
+      <td><span class="badge badge-ok">ALIVE</span></td>
+    </tr>`;
+  }).join('');
+}
+
+/* -----------------------------------------------------------------------
+ * Render workloads
+ * Format: OK|LIST|n|app:node:pid,app:node:pid,...
+ * --------------------------------------------------------------------- */
+function renderWorkloads(raw) {
+  const parts = raw.split('|');
+  if (parts.length < 4) return;
+  const entries = parts[3] ? parts[3].split(',') : [];
+  const tbody   = document.getElementById('workload-table-body');
+  document.getElementById('workload-count').textContent = entries.length;
+
+  apps.clear();
+  const sel = document.getElementById('log-app-select');
+
+  if (!entries.length || !entries[0]) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">No active workloads</td></tr>';
+    sel.innerHTML   = '<option value="">-- select app --</option>';
+    return;
+  }
+
+  tbody.innerHTML = entries.map(e => {
+    const [app, node, pid] = e.split(':');
+    if (!app) return '';
+    apps.add(app);
+    const pending  = (!pid || pid === '0');
+    const status   = pending
+      ? '<span class="badge badge-pending">PENDING</span>'
+      : '<span class="badge badge-ok">RUNNING</span>';
+    const evictBtn = (userRole === 'admin')
+      ? `<button class="action-btn" onclick="evict('${app}')">Evict</button>`
+      : '—';
+    const nodeShort = node && node.length > 8 ? node.slice(0, 8) + '…' : (node || '—');
+    return `<tr>
+      <td><strong>${app}</strong></td>
+      <td><span class="cell-id" title="${node || ''}">${nodeShort}</span></td>
+      <td>${pending ? '<span style="color:var(--muted)">pending</span>' : pid}</td>
+      <td>${status}</td>
+      <td>${evictBtn}</td>
+    </tr>`;
+  }).join('');
+
+  /* Rebuild log app selector */
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">-- select app --</option>' +
+    [...apps].map(a => `<option value="${a}" ${a===prev?'selected':''}>${a}</option>`).join('');
+}
+
+/* -----------------------------------------------------------------------
+ * Render services (tower)
+ * Format: OK|LIST|n|name:ip:port:ttl,...  (tower variant)
+ * --------------------------------------------------------------------- */
+function renderServices(raw) {
+  const parts = raw.split('|');
+  if (parts.length < 4) return;
+  const entries = parts[3] ? parts[3].split(',') : [];
+  const tbody   = document.getElementById('service-table-body');
+  document.getElementById('service-count').textContent = entries.length;
+
+  if (!entries.length || !entries[0]) {
+    tbody.innerHTML = '<tr><td colspan="4" class="empty">No services registered</td></tr>';
+    return;
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  tbody.innerHTML = entries.map(e => {
+    const [name, ip, port, ttl] = e.split(':');
+    if (!name) return '';
+    const ttlN   = parseInt(ttl || '0', 10);
+    const ttlRem = ttlN - now;
+    const badge  = ttlRem > 30
+      ? '<span class="badge badge-ok">LIVE</span>'
+      : ttlRem > 0
+        ? '<span class="badge badge-warn">EXPIRING</span>'
+        : '<span class="badge badge-err">EXPIRED</span>';
+    return `<tr>
+      <td><strong>${name}</strong></td>
+      <td style="font-family:var(--mono)">${ip || '—'}:${port || '—'}</td>
+      <td style="font-family:var(--mono)">${ttlRem > 0 ? ttlRem + 's' : 'expired'}</td>
+      <td>${badge}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* -----------------------------------------------------------------------
+ * Actions
+ * --------------------------------------------------------------------- */
+function evict(app) {
+  if (!confirm(`Evict workload "${app}"? This kills all replicas.`)) return;
+  send('EVICT|' + app);
+  setTimeout(reqList, 1500);
+}
+
+function submitManifest() {
+  const path = document.getElementById('manifest-path').value.trim();
+  if (!path) return;
+  send('SUBMIT|' + path);
+}
+
+function fetchLogs() {
+  const app = document.getElementById('log-app-select').value;
+  if (!app) {
+    document.getElementById('log-output').textContent = 'Select an app first.';
+    return;
+  }
+  document.getElementById('log-output').textContent = 'Fetching…';
+  send('LOGS|' + app);
+}
+
+function clearAgent() {
+  document.getElementById('agent-feed').textContent = 'Feed cleared.';
+}
+
+/* -----------------------------------------------------------------------
+ * Tab switching
+ * --------------------------------------------------------------------- */
+function showTab(el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('panel-' + el.dataset.panel).classList.add('active');
+
+  /* Refresh data when switching to a panel */
+  switch (el.dataset.panel) {
+    case 'cluster':   reqNodes();    break;
+    case 'workloads': reqList();     break;
+    case 'services':  reqServices(); break;
+  }
+}
+
+/* -----------------------------------------------------------------------
+ * Services panel — needs its own WS interception
+ * We disambiguate by tracking the last request sent.
+ * --------------------------------------------------------------------- */
+let _lastReq = null;
+const _origSend = send;
+
+/* Override send to track last command */
+window.reqServices = function() {
+  _lastReq = 'SERVICES';
+  if (ws && ws.readyState === 1) ws.send('SERVICES');
+};
+window.reqList = function() {
+  _lastReq = 'LIST';
+  if (ws && ws.readyState === 1) ws.send('LIST');
+};
+window.reqNodes = function() {
+  _lastReq = 'NODES';
+  if (ws && ws.readyState === 1) ws.send('NODES');
+};
+
+/* Patch handleMessage to route OK|LIST correctly */
+const _origHandle = handleMessage;
+window.handleMessage = function(raw) {
+  if (raw.startsWith('OK|LIST|') && _lastReq === 'SERVICES') {
+    renderServices(raw);
+    _lastReq = null;
+    return;
+  }
+  if (raw.startsWith('OK|LIST|') && _lastReq === 'LIST') {
+    renderWorkloads(raw);
+    _lastReq = null;
+    return;
+  }
+  if (raw.startsWith('PUSH|OK|LIST|')) {
+    renderWorkloads(raw.slice(5));
+    return;
+  }
+  _origHandle(raw);
+};
+
+/* Re-bind ws.onmessage after login sets ws */
+const _origLogin = doLogin;
+window.doLogin = function() {
+  _origLogin();
+  setTimeout(() => {
+    if (ws) ws.onmessage = (ev) => window.handleMessage(ev.data);
+  }, 100);
+};
+
+/* Enter key on token textarea */
+document.getElementById('token-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.ctrlKey) doLogin();
+});
+</script>
+</body>
+</html>

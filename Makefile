@@ -25,7 +25,9 @@ all: $(BIN) \
      $(BIN)/skr8tr_node \
      $(BIN)/skr8tr_sched \
      $(BIN)/skr8tr_reg \
-     $(BIN)/skr8tr_serve
+     $(BIN)/skr8tr_serve \
+     $(BIN)/skr8tr_cockpit \
+     $(BIN)/gen_skrtrpass
 
 $(BIN):
 	mkdir -p $(BIN)
@@ -42,6 +44,12 @@ $(BIN)/skr8tr_reg: $(SRC)/daemon/skr8tr_reg.c $(SRC)/core/fabric.c
 
 $(BIN)/skr8tr_serve: $(SRC)/server/skr8tr_serve.c
 	$(CC) $(CFLAGS) $^ -o $@ -lpthread
+
+$(BIN)/skr8tr_cockpit: $(SRC)/cockpit/skr8tr_cockpit.c $(SRC)/core/fabric.c
+	$(CC) $(CFLAGS) -I./src/cockpit $^ -o $@ $(LDFLAGS)
+
+$(BIN)/gen_skrtrpass: $(SRC)/cockpit/gen_skrtrpass.c
+	$(CC) $(CFLAGS) -I./src/cockpit $^ -o $@ $(LDFLAGS)
 
 clean:
 	rm -rf $(BIN)
