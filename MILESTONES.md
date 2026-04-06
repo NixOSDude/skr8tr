@@ -297,3 +297,35 @@ RUST_LOG=info SKRTRVIEW_PIPE=/tmp/skr8trview.pipe \
 
 ### Next Milestone
 Phase 11: NixOS flake overlay for reproducible commercial builds
+
+---
+
+## [2026-04-06] main — Phase 11a: Args Fix + PID Tracking — Full Workload Verification
+
+### Bugs Fixed
+1. **SkrProc missing `args` field** — `SkrProc` struct had no args field; node built `argv = { bin, NULL }`.
+   `sleep` with no args exits immediately → zombie. Fix: added `char args[512]` to struct.
+2. **Conductor never captured real PID** — `launch_replica()` sent LAUNCH on `send_sock` (bound to 7771),
+   never read reply → `pid=0` stored forever. Fix: ephemeral `fabric_bind(0)` socket for LAUNCH send/recv;
+   parses `OK|LAUNCHED|name|pid` reply to record real PID.
+3. **`exec` manifest key not parsed** — `skrmaker.c` only recognized `bin`; `exec` (the natural key name)
+   was silently ignored. Fix: both `exec` and `bin` keys now populate `proc->bin`.
+
+### Files Modified
+- `src/parser/skrmaker.h` — `char args[512]` added to `SkrProc` after `bin`
+- `src/parser/skrmaker.c` — `exec` + `args` key parsing added
+- `src/daemon/skr8tr_sched.c` — ephemeral socket PID capture; `args=` in LAUNCH command
+- `src/daemon/skr8tr_node.c` — extract `args=` from LAUNCH; full argv build in `launch_proc()`
+- `examples/my-server.skr8tr` — NEW: `exec /bin/sleep` + `args 3600` test workload
+
+### Verified End-to-End
+```
+$ echo "SUBMIT|.../my-server.skr8tr" > /dev/udp/127.0.0.1/7771
+$ exec 3<>/dev/udp/127.0.0.1/7771; echo -n "LIST" >&3; ...
+OK|LIST|1|my-server:b33c8ed0...:968189
+
+$ ps -p 968189 -o pid,ppid,comm,args
+968189  967724 sleep  /bin/sleep 3600   ✓
+```
+
+Workloads tab now shows real PID. Replicas no longer stuck in "pending".
