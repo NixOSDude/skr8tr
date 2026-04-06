@@ -244,3 +244,21 @@ nohup bin/skr8tr_cockpit --ui ./ui --pubkey ./skrtrview.pub > /tmp/cockpit.log 2
 
 ### Next Milestone
 Phase 10: Agent Feed live integration — pipe skr8tr-agent events into Skr8trView
+
+---
+
+## [2026-04-06] main — Phase 9 Hotfix: Skr8trView WebSocket + Dev Mode
+
+### Bugs Fixed
+1. **SHA-1 single-block overflow** — WS key (24) + GUID (36) = 60 bytes spans two SHA-1 blocks.
+   Old code processed only one block → wrong `Sec-WebSocket-Accept` → browser rejected upgrade.
+   Fix: extracted `sha1_block()`, proper two-block pad/process in `sha1()`.
+
+2. **Dev mode bypass** — Empty token sent `AUTH|` → `skrtrpass_verify("")` returned
+   `SKRTRPASS_ERR_PARSE` before ever checking pubkey file → "Auth failed: malformed token".
+   Fix: `stat(g_pubkey_path)` first; if file absent → grant admin without calling verify.
+
+### Status
+- Skr8trView fully operational: `http://127.0.0.1:7780/`
+- Dev mode confirmed: empty token → AUTH_OK|admin
+- All 5 panels loading (Cluster/Workloads/Services/Logs/Agent Feed)

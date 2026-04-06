@@ -284,39 +284,17 @@ static int query_logs(const char* app, char* out, size_t cap) {
  * WebSocket framing — RFC 6455 minimal implementation
  * ---------------------------------------------------------------------- */
 
-/* Compute Sec-WebSocket-Accept from client key */
-static void ws_accept_key(const char* client_key, char* out64, size_t out_len) {
-    /* SHA-1 of (client_key + GUID) → base64 */
-    static const char GUID[] = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
-
-    char cat[256];
-    snprintf(cat, sizeof(cat), "%s%s", client_key, GUID);
-    size_t cat_len = strlen(cat);
-
-    /* SHA-1 — hand-rolled to avoid external deps */
-    uint32_t h0=0x67452301, h1=0xEFCDAB89, h2=0x98BADCFE,
-             h3=0x10325476, h4=0xC3D2E1F0;
-
-    /* Pad message */
-    uint8_t msg[128] = {0};
-    memcpy(msg, cat, cat_len);
-    msg[cat_len] = 0x80;
-    uint64_t bit_len = (uint64_t)cat_len * 8;
-    /* big-endian bit length at bytes 56-63 */
-    for (int i = 0; i < 8; i++)
-        msg[63 - i] = (uint8_t)(bit_len >> (8 * i));
-
-    /* One block (≤55 bytes of input) */
+/* SHA-1 block compression — processes one 64-byte block into h[0..4] */
+static void sha1_block(uint32_t h[5], const uint8_t blk[64]) {
     uint32_t w[80];
     for (int i = 0; i < 16; i++)
-        w[i] = ((uint32_t)msg[i*4]   << 24) | ((uint32_t)msg[i*4+1] << 16) |
-               ((uint32_t)msg[i*4+2] <<  8) |  (uint32_t)msg[i*4+3];
+        w[i] = ((uint32_t)blk[i*4]   << 24) | ((uint32_t)blk[i*4+1] << 16) |
+               ((uint32_t)blk[i*4+2] <<  8) |  (uint32_t)blk[i*4+3];
     for (int i = 16; i < 80; i++) {
         uint32_t t = w[i-3] ^ w[i-8] ^ w[i-14] ^ w[i-16];
         w[i] = (t << 1) | (t >> 31);
     }
-
-    uint32_t a=h0, b=h1, c=h2, d=h3, e=h4;
+    uint32_t a=h[0], b=h[1], c=h[2], d=h[3], e=h[4];
     for (int i = 0; i < 80; i++) {
         uint32_t f, k;
         if      (i < 20) { f=(b&c)|((~b)&d); k=0x5A827999; }
@@ -326,18 +304,50 @@ static void ws_accept_key(const char* client_key, char* out64, size_t out_len) {
         uint32_t tmp = ((a<<5)|(a>>27)) + f + e + k + w[i];
         e=d; d=c; c=(b<<30)|(b>>2); b=a; a=tmp;
     }
-    h0+=a; h1+=b; h2+=c; h3+=d; h4+=e;
+    h[0]+=a; h[1]+=b; h[2]+=c; h[3]+=d; h[4]+=e;
+}
+
+/* SHA-1 of arbitrary-length message (up to 119 bytes — covers WS handshake) */
+static void sha1(const uint8_t* msg, size_t len, uint8_t digest[20]) {
+    uint32_t h[5] = {0x67452301,0xEFCDAB89,0x98BADCFE,0x10325476,0xC3D2E1F0};
+
+    /* Build padded message in 128-byte buffer (max two 64-byte blocks) */
+    uint8_t padded[128] = {0};
+    memcpy(padded, msg, len);
+    padded[len] = 0x80;
+
+    /* Append big-endian 64-bit bit-length at the end of the last block */
+    uint64_t bit_len = (uint64_t)len * 8;
+    size_t   total   = (len < 56) ? 64 : 128;   /* one or two blocks */
+    for (int i = 0; i < 8; i++)
+        padded[total - 1 - i] = (uint8_t)(bit_len >> (8 * i));
+
+    /* Process block(s) */
+    sha1_block(h, padded);
+    if (total == 128)
+        sha1_block(h, padded + 64);
+
+    /* Produce digest */
+    for (int i = 0; i < 5; i++) {
+        digest[4*i]   = (uint8_t)(h[i] >> 24);
+        digest[4*i+1] = (uint8_t)(h[i] >> 16);
+        digest[4*i+2] = (uint8_t)(h[i] >>  8);
+        digest[4*i+3] = (uint8_t)(h[i]);
+    }
+}
+
+/* Compute Sec-WebSocket-Accept from client key */
+static void ws_accept_key(const char* client_key, char* out64, size_t out_len) {
+    static const char GUID[] = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+
+    char cat[256];
+    int  cat_len = snprintf(cat, sizeof(cat), "%s%s", client_key, GUID);
+    if (cat_len < 0) { out64[0] = '\0'; return; }
 
     uint8_t digest[20];
-    uint32_t hh[5] = {h0,h1,h2,h3,h4};
-    for (int i = 0; i < 5; i++) {
-        digest[4*i]   = (uint8_t)(hh[i] >> 24);
-        digest[4*i+1] = (uint8_t)(hh[i] >> 16);
-        digest[4*i+2] = (uint8_t)(hh[i] >>  8);
-        digest[4*i+3] = (uint8_t)(hh[i]);
-    }
+    sha1((const uint8_t*)cat, (size_t)cat_len, digest);
 
-    /* Base64 encode */
+    /* Base64 encode digest */
     static const char B64[] =
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     size_t i = 0, o = 0;
@@ -678,13 +688,18 @@ static void* session_thread(void* arg) {
         }
 
         const char* token = frame + 5;
-        int role = skrtrpass_verify(token, g_pubkey_path);
 
-        if (role == SKRTRPASS_ERR_PUBKEY) {
-            /* No pubkey file → dev mode, grant admin */
-            fprintf(stderr, "[cockpit] WARN: no pubkey at %s — dev mode, granting admin\n",
+        /* Dev mode: if the pubkey file does not exist, bypass auth entirely */
+        struct stat _pubkey_st;
+        int _has_pubkey = (stat(g_pubkey_path, &_pubkey_st) == 0);
+
+        int role;
+        if (!_has_pubkey) {
+            fprintf(stderr, "[cockpit] WARN: no pubkey at '%s' — dev mode, granting admin\n",
                     g_pubkey_path);
             role = SKRTRPASS_ROLE_ADMIN;
+        } else {
+            role = skrtrpass_verify(token, g_pubkey_path);
         }
 
         if (role < 0) {
