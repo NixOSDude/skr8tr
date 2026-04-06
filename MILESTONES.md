@@ -101,7 +101,55 @@ Build Phase 1: SkrtrMaker parser + skr8tr_node.c worker daemon
 - Hardware/cloud agnostic by design: bare process on any Linux host, UDP mesh
   auto-discovers peers on subnet — no cloud SDK, no container runtime.
 
+---
+
+## [2026-04-05] main — Phase 4 + 5 Complete: Tower + Deck — FULL STACK OPERATIONAL
+
+### Files Delivered
+- `src/daemon/skr8tr_reg.c` — SSoA LEVEL 1: The Tower (service registry)
+- `cli/Cargo.toml` + `cli/src/main.rs` — SSoA LEVEL 3: The Deck (Rust CLI)
+
+### Tower Verified
+- REGISTER|name|ip|port → OK|REGISTERED ✓
+- LOOKUP round-robin across 3 replicas: .10 → .11 → .12 ✓
+- After DEREGISTER one: alternates remaining two ✓
+- ERR|NOT_FOUND for unknown service ✓
+- TTL countdown shown in LIST ✓
+- Reaper thread expires stale entries automatically ✓
+
+### CLI Verified (full stack: node + sched + reg + serve + skr8tr)
+- skr8tr ping  → conductor ok, tower ok ✓
+- skr8tr nodes → 1 node, node_id, ip, cpu%, ram_free_mb ✓
+- skr8tr up    → submitted, app name + node_id returned ✓
+- skr8tr status → nodes + 3 replicas placed ✓
+- skr8tr lookup → ERR|NOT_FOUND for unregistered service ✓
+- skr8tr down  → evicted ok ✓
+- skr8tr list  → 0 replica(s) running ✓
+
+### All 5 Phases Complete
+| Phase | Component | Binary |
+|-------|-----------|--------|
+| 1 | SkrtrMaker Parser + Fleet Node | bin/skr8tr_node |
+| 2 | Static File Server | bin/skr8tr_serve |
+| 3 | The Conductor (scheduler) | bin/skr8tr_sched |
+| 4 | The Tower (service registry) | bin/skr8tr_reg |
+| 5 | The Deck (Rust CLI) | cli/target/release/skr8tr |
+
+### Architecture
+- Hardware/cloud agnostic: bare process on any Linux host
+- PQC identity: ML-DSA-65 ephemeral per-node via liboqs
+- Elastic: heartbeat-driven scale up/down, dead node recovery
+- Process-agnostic: any compiled binary, any language
+- VM/hypervisor orchestration: Phase 6 path — point bin at QEMU/Firecracker
+- No Docker. No YAML. No etcd. No Kubernetes. 15MB control plane.
+
 ### Next Milestone
+Phase 6: VM/Hypervisor workloads (Firecracker microVMs as SkrProc targets)
+  OR production hardening: persistent workload state, TLS on Tower, log streaming
+
+---
+
+## BACKBURNER — was: Next Milestone
 Phase 3: `skr8tr_sched.c` — The Conductor
 - Masterless capacity-aware scheduler
 - Consumes HEARTBEAT stream from all nodes

@@ -6,65 +6,77 @@
 
 ### Last Completed Task
 
-**Phase 2 — `skr8tr_serve.c` Sovereign Static File Server — COMPLETE**
+**ALL 5 PHASES COMPLETE — Full Skr8tr Stack Operational**
+
+Phases 3, 4, and 5 completed this session:
+- Phase 3: skr8tr_sched.c — The Conductor (masterless scheduler)
+- Phase 4: skr8tr_reg.c  — The Tower (service registry, round-robin lookup)
+- Phase 5: cli/src/main.rs — The Deck (Rust CLI: up/down/status/nodes/list/lookup/ping)
 
 Full integration verified:
-- skr8tr_node --run manifest.skr8tr with `serve static <dir>` automatically
-  locates and execs skr8tr_serve with --dir and --port arguments
-- HTTP/1.1 GET, HEAD, 200, 304 (ETag), 404→SPA fallback all verified
-- sendfile() zero-copy, detached pthreads per connection
-- MIME table: 23 types including wasm, woff2, map
-- Path traversal protection via realpath() + prefix jail
-
-Phases 1 + 2 together: parse manifest → launch node → serve static app
-The k8s killer stack is operational at the foundation level.
+  skr8tr ping   → conductor + tower both ok
+  skr8tr nodes  → live node table with cpu% and ram
+  skr8tr up     → manifest submitted, replicas placed on mesh
+  skr8tr status → nodes + placement table
+  skr8tr down   → workload evicted, replicas killed
+  skr8tr list   → 0 replicas after eviction
 
 ### Next Task (resume here)
 
-**Phase 3 — `src/daemon/skr8tr_sched.c` — The Conductor**
+**Phase 6 — Choose one:**
 
-Masterless capacity-aware scheduler. This is the k8s killer's brain.
+Option A: VM/Hypervisor workloads
+  - SkrtrMaker `type wasm` already in parser
+  - Add `type vm` support: bin points at Firecracker or QEMU
+  - skr8tr_node detects `type vm` and launches with hypervisor wrapper
+  - Enables full OS orchestration — any guest OS on any host
 
-Requirements:
-- Listen on UDP port 7771 (Conductor channel per CLAUDE.md)
-- Also listen on 7770 to receive HEARTBEAT datagrams from all nodes
-- Maintain a node registry: node_id → { ip, cpu_pct, ram_free_mb, last_seen }
-- Expire nodes not seen for 15s (dead node detection)
-- Accept workload submissions: SUBMIT|<manifest_path>
-- For each workload, pick the least-loaded eligible node and send LAUNCH|...
-- Monitor replica counts: if a replica dies (node disappears), relaunch on
-  another node
-- Implement scale-up: if cpu_pct > cpu-above threshold for >2 heartbeat cycles,
-  launch additional replica (up to max)
-- Implement scale-down: if cpu_pct < cpu-below threshold for >4 cycles,
-  send KILL to one replica (down to min)
-- No leader election. No SPOF. The Conductor is stateless — any node can run it.
-  Multiple Conductors on a subnet converge via consistent-hash assignment.
-- SSoA LEVEL 1
+Option B: Production hardening
+  - Persistent workload state (survive Conductor restart)
+  - Log streaming: `skr8tr logs <app>` tails process stdout via UDP
+  - skr8tr_node auto-registers launched services with the Tower
+  - Health check enforcement: node kills and relaunches failing processes
+
+Recommend: Option B first (makes current stack production-usable),
+           then Option A (extends scope to VM orchestration).
 
 ### Open Blockers
-- None
+- CLI binary must be built with absolute rustc path (not in nix shell PATH):
+  RUSTC=~/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc \
+  ~/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo build --release
+- Daemons must be launched with absolute paths (not relative bin/ paths)
+  due to nix shell working directory behavior
 
 ### Files Modified This Session
-- src/server/skr8tr_serve.c (NEW — HTTP/1.1 static file server)
-- src/daemon/skr8tr_node.c (updated — auto-launches skr8tr_serve for static workloads)
-- MILESTONES.md (Phase 2 milestone appended)
-
-### Architecture Notes (Captain additions)
-- Skr8tr is elastic: scale up/down is driven by cpu_pct from heartbeats
-- No GPU dependency — GPU is LambdaC's domain
-- Hardware/cloud agnostic: UDP mesh, bare processes, no cloud SDK
-- skr8tr_serve serves ANY static app (React, Vue, Svelte, raw HTML, WASM) —
-  not React-specific, the example is just illustrative
+- src/daemon/skr8tr_sched.c (NEW — Phase 3)
+- src/daemon/skr8tr_reg.c   (NEW — Phase 4)
+- cli/Cargo.toml             (NEW — Phase 5)
+- cli/src/main.rs            (NEW — Phase 5)
+- MILESTONES.md
+- SESSION_STATE.md
 
 ### Build Commands
+# C23 daemons (from /home/sbaker/skr8tr):
 gcc -std=gnu23 -Wall -Wextra -O2 \
   -I./src/core -I./src/parser \
   -I/nix/store/ivgra1x5vxd2frx380l5lbnycifr6fvm-liboqs-0.15.0-dev/include \
   src/daemon/skr8tr_node.c src/core/fabric.c src/parser/skrmaker.c \
   -o bin/skr8tr_node \
-  -L/nix/store/l8p18zsf1jaivqfs14q0aq1dvb3cqr7a-liboqs-0.15.0/lib \
-  -loqs -lpthread
+  -L/nix/store/l8p18zsf1jaivqfs14q0aq1dvb3cqr7a-liboqs-0.15.0/lib -loqs -lpthread
+
+gcc -std=gnu23 -Wall -Wextra -O2 \
+  -I./src/core -I./src/parser \
+  -I/nix/store/ivgra1x5vxd2frx380l5lbnycifr6fvm-liboqs-0.15.0-dev/include \
+  src/daemon/skr8tr_sched.c src/core/fabric.c src/parser/skrmaker.c \
+  -o bin/skr8tr_sched \
+  -L/nix/store/l8p18zsf1jaivqfs14q0aq1dvb3cqr7a-liboqs-0.15.0/lib -loqs -lpthread
+
+gcc -std=gnu23 -Wall -Wextra -O2 -I./src/core \
+  src/daemon/skr8tr_reg.c src/core/fabric.c -o bin/skr8tr_reg -lpthread
 
 gcc -std=gnu23 -Wall -Wextra -O2 -I./src/core \
   src/server/skr8tr_serve.c -o bin/skr8tr_serve -lpthread
+
+# Rust CLI:
+cd cli && RUSTC=~/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc \
+  ~/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo build --release
