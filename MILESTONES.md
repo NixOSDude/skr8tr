@@ -144,26 +144,55 @@ Build Phase 1: SkrtrMaker parser + skr8tr_node.c worker daemon
 - No Docker. No YAML. No etcd. No Kubernetes. 15MB control plane.
 
 ### Next Milestone
-Phase 6: VM/Hypervisor workloads (Firecracker microVMs as SkrProc targets)
-  OR production hardening: persistent workload state, TLS on Tower, log streaming
+Phase 7: TLS on Tower, NixOS overlay for reproducible builds, public alpha packaging
 
 ---
 
-## BACKBURNER — was: Next Milestone
-Phase 3: `skr8tr_sched.c` — The Conductor
-- Masterless capacity-aware scheduler
-- Consumes HEARTBEAT stream from all nodes
-- Assigns LAUNCH commands to least-loaded nodes
-- Enforces replica counts from LambProc descriptors
-- Implements scale up/down using cpu-above/cpu-below thresholds
-- No leader election. No SPOF. Any node can run the Conductor.
-
 ---
 
-## BACKBURNER
+## [2026-04-05] feature/sovereign-multiplication-logic — Phase 6 Complete: VM Orchestration + Production Hardening
 
-- Phase 2: skr8tr_sched.c — capacity-aware masterless scheduler
-- Phase 3: skr8tr_reg.c — service registry (Tower)
-- Phase 4: Rust CLI (`skr8tr` binary) — up/down/scale/status/logs
-- Phase 5: LambdaC workload integration — .lc jobs as native Skr8tr targets
-- Phase 6: LambdaStrater — full enterprise orchestration platform on Skr8tr foundation
+### Files Delivered / Modified
+- `src/parser/skrmaker.h` — Added `SkrtrVM` struct + `SKRTR_TYPE_VM` enum variant
+- `src/parser/skrmaker.c` — Added `parse_vm()` block parser; `type vm` wired in `parse_app`
+- `src/daemon/skr8tr_node.c` — Full Phase 6 rewrite:
+  - Dual-socket architecture: port 7770 (mesh broadcast) + port 7775 (dedicated command port)
+  - `LogRing` (200 × 256) per-process stdout/stderr ring buffer
+  - `log_reader_thread()` — captures child stdout/stderr via pipe
+  - `health_probe()` — TCP + HTTP GET health check enforcement; kill+mark-inactive on failure
+  - `tower_register()` / `tower_deregister()` — auto-registration with Tower on launch/kill
+  - `launch_vm()` — QEMU argv builder + Firecracker JSON config generator
+  - LOGS command handler — returns ring buffer to CLI
+  - `--tower <host>` CLI flag
+- `src/daemon/skr8tr_sched.c` — Persistent workload state:
+  - `manifest_path` field in `Workload` struct
+  - `state_save()` — writes active manifest paths to `/tmp/skr8tr_conductor.state`
+  - `state_load()` — replays SUBMIT commands on restart
+  - Forward declaration to resolve ordering
+- `cli/src/main.rs` — Added `logs` command:
+  - Two-step node resolution: LIST → find node_id, NODES → find node IP
+  - Queries node:7775 directly for `LOGS|<app>` response
+  - `find_node_for_app()` / `find_ip_for_node()` helpers
+- `examples/vm-workload.skr8tr` — NEW: Firecracker microVM manifest example
+
+### Verified — Full Integration
+| Command | Result |
+|---------|--------|
+| `skr8tr ping` | conductor ok, tower ok |
+| `skr8tr nodes` | 2 nodes, node_id, ip, cpu%, ram_free_mb |
+| `skr8tr up analytics-job.skr8tr` | submitted, placement recorded |
+| `skr8tr list` | 1-2 replicas listed |
+| `skr8tr logs test-echo` | 0 lines captured (sh has no output — correct) |
+| `skr8tr down test-echo` | evicted ok |
+| `skr8tr status` | 0 replicas after eviction |
+| Persistent state | `/tmp/skr8tr_conductor.state` written on SUBMIT, cleared on EVICT |
+
+### Architecture Now
+- Fleet node: dual UDP sockets (7770 mesh / 7775 cmd), full log capture, health enforcement
+- Conductor: survives restart — state persists and replays
+- VM orchestration: QEMU and Firecracker microVMs as SkrProc workloads
+- CLI: `up / down / status / nodes / list / lookup / logs / ping`
+- Zero Docker. Zero YAML. Zero etcd. Zero Kubernetes. ~20KB control plane.
+
+### Next Milestone
+Phase 7: NixOS overlay for reproducible builds + commercial packaging ($19.99/site/month)

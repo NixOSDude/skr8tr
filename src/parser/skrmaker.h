@@ -6,8 +6,8 @@
  * These structs are the canonical SkrProc descriptor. All daemons
  * read from this header. Do not modify without full downstream audit.
  *
- * Skr8tr is process-agnostic. It launches binaries — compiled from any
- * language, built by any toolchain. Source language, data formats, and
+ * Skr8tr is process-agnostic. It launches binaries and VMs — compiled from
+ * any language, built by any toolchain. Source language, data formats, and
  * analytics frameworks are outside Skr8tr's scope.
  */
 
@@ -37,6 +37,7 @@ typedef enum {
     SKRTR_TYPE_SERVICE = 0,   /* long-running process (default) */
     SKRTR_TYPE_JOB,           /* run-to-completion binary */
     SKRTR_TYPE_WASM,          /* WASM module via wasmtime */
+    SKRTR_TYPE_VM,            /* full VM — QEMU or Firecracker microVM */
 } SkrtrWorkloadType;
 
 /* -------------------------------------------------------------------------
@@ -46,7 +47,7 @@ typedef enum {
 typedef struct {
     char run[SKRMAKER_MAX_RUNS][SKRMAKER_CMD_LEN];
     int  run_count;
-    char out[SKRMAKER_PATH_LEN];   /* build output directory */
+    char out[SKRMAKER_PATH_LEN];
 } SkrtrBuild;
 
 typedef struct {
@@ -57,7 +58,7 @@ typedef struct {
 } SkrtrServe;
 
 typedef struct {
-    char check[SKRMAKER_CMD_LEN];       /* "GET /path 200" */
+    char check[SKRMAKER_CMD_LEN];   /* "GET /path 200" */
     char interval[32];
     char timeout[32];
     int  retries;
@@ -66,8 +67,8 @@ typedef struct {
 typedef struct {
     int min;
     int max;
-    int cpu_above;   /* percent threshold to scale up */
-    int cpu_below;   /* percent threshold to scale down */
+    int cpu_above;
+    int cpu_below;
 } SkrtrScale;
 
 typedef struct {
@@ -75,14 +76,22 @@ typedef struct {
     char val[SKRMAKER_ENV_VAL];
 } SkrtrEnvVar;
 
+/* VM configuration — only populated when workload_type == SKRTR_TYPE_VM */
+typedef struct {
+    char hypervisor[SKRMAKER_PATH_LEN]; /* path: qemu-system-x86_64 or firecracker */
+    char kernel[SKRMAKER_PATH_LEN];     /* kernel image or Firecracker kernel */
+    char rootfs[SKRMAKER_PATH_LEN];     /* root disk image */
+    int  vcpus;                         /* virtual CPUs */
+    int  memory_mb;                     /* RAM in MB */
+    char net[64];                       /* network: "user" | "tap:<iface>" */
+    char extra_args[SKRMAKER_CMD_LEN];  /* additional hypervisor arguments */
+} SkrtrVM;
+
 /* -------------------------------------------------------------------------
  * SkrProc — Canonical Workload Descriptor
  *
  * One SkrProc per `app` block. Multiple apps in one .skr8tr file
  * are returned as a linked list via the `next` pointer.
- *
- * Skr8tr launches bare processes. The binary can be compiled from any
- * language — C, Rust, Go, LambdaC, WASM, anything. Skr8tr does not care.
  * ---------------------------------------------------------------------- */
 
 typedef struct SkrProc {
@@ -91,7 +100,7 @@ typedef struct SkrProc {
     SkrtrWorkloadType  workload_type;
 
     /* process */
-    char               bin[SKRMAKER_PATH_LEN];   /* path to binary */
+    char               bin[SKRMAKER_PATH_LEN];
 
     /* resources */
     int                port;
@@ -104,12 +113,13 @@ typedef struct SkrProc {
     SkrtrServe         serve;
     SkrtrHealth        health;
     SkrtrScale         scale;
+    SkrtrVM            vm;           /* populated for SKRTR_TYPE_VM */
 
-    /* environment variables injected into each instance */
+    /* environment variables */
     SkrtrEnvVar        env[SKRMAKER_MAX_ENV];
     int                env_count;
 
-    /* linked list — multiple apps per file */
+    /* linked list */
     struct SkrProc*    next;
 } SkrProc;
 
@@ -117,23 +127,6 @@ typedef struct SkrProc {
  * Public API
  * ---------------------------------------------------------------------- */
 
-/*
- * skrmaker_parse — Parse a .skr8tr manifest file.
- *
- * Returns the head of a SkrProc linked list (one node per `app` block),
- * or NULL on error. On error, `err` is populated with a human-readable
- * message including file path and line number.
- *
- * Caller owns the returned list; free with skrmaker_free().
- */
 SkrProc* skrmaker_parse(const char* path, char* err, size_t err_len);
-
-/*
- * skrmaker_free — Release all memory allocated by skrmaker_parse().
- */
-void skrmaker_free(SkrProc* proc);
-
-/*
- * skrmaker_dump — Print a parsed SkrProc list to stdout (debug).
- */
-void skrmaker_dump(const SkrProc* proc);
+void     skrmaker_free(SkrProc* proc);
+void     skrmaker_dump(const SkrProc* proc);
