@@ -196,3 +196,51 @@ Phase 7: TLS on Tower, NixOS overlay for reproducible builds, public alpha packa
 
 ### Next Milestone
 Phase 7: NixOS overlay for reproducible builds + commercial packaging ($19.99/site/month)
+
+---
+
+## [2026-04-06] main — Phase 9: Skr8trView — Sovereign Mesh Control UI
+
+### What Was Built
+Full-stack sovereign control panel for the Skr8tr mesh. Five files, zero external frameworks.
+
+| File | Role |
+|------|------|
+| `src/cockpit/skrtrpass.h` | ML-DSA-65 SkrtrPass token verify + mint (SSoA L1) |
+| `src/cockpit/skr8tr_cockpit.c` | C23 WebSocket cockpit server, port 7780 (SSoA L2) |
+| `src/cockpit/gen_skrtrpass.c` | Token keygen/mint/verify CLI (SSoA L3) |
+| `ui/index.html` | Sovereign dark-theme single-page UI (SSoA L3) |
+| `Makefile` | Added skr8tr_cockpit + gen_skrtrpass targets |
+
+### Skr8trView Architecture
+- **Port 7780**: HTTP static server (serves `ui/`) + WebSocket upgrade at `/ws`
+- **Auth gate**: First WS frame must be `AUTH|<skrtrpass_token>`
+  - ML-DSA-65 verify against `skrtrview.pub`
+  - Grants: `AUTH_OK|operator` (read-only) or `AUTH_OK|admin` (full control)
+  - Dev mode: no pubkey file → auto-grant admin
+- **WS commands**: NODES, LIST, SERVICES, LOGS|app, SUBMIT|path (admin), EVICT|app (admin), PING
+- **Push thread**: broadcasts live NODES + LIST to all authed sessions every 5s
+- **UI panels**: Cluster, Workloads, Services, Logs, Agent Feed
+
+### Tokens
+```bash
+# Generate keypair (one-time):
+bin/gen_skrtrpass keygen
+
+# Mint operator token (30 days):
+bin/gen_skrtrpass mint --role operator --user captain --ttl 2592000 --key skrtrview.sec
+
+# Mint admin token:
+bin/gen_skrtrpass mint --role admin --user captain --ttl 2592000 --key skrtrview.sec
+
+# Start cockpit:
+nohup bin/skr8tr_cockpit --ui ./ui --pubkey ./skrtrview.pub > /tmp/cockpit.log 2>&1 &
+# Then open: http://127.0.0.1:7780/
+```
+
+### Build Status
+- Both binaries compile clean: zero warnings, zero errors, `-std=gnu23 -Wall -Wextra`
+- Pushed: Gitea `gitea/skr8tr` main → e7e4328
+
+### Next Milestone
+Phase 10: Agent Feed live integration — pipe skr8tr-agent events into Skr8trView
