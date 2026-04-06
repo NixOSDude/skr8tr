@@ -61,6 +61,7 @@
  * ---------------------------------------------------------------------- */
 
 #define COCKPIT_PORT          7780
+#define DEFAULT_PIPE_PATH     "/tmp/skr8trview.pipe"
 #define CONDUCTOR_IP          "127.0.0.1"
 #define CONDUCTOR_STATUS_PORT 7771
 #define CONDUCTOR_CMD_PORT    7775
@@ -89,6 +90,7 @@ static int            g_udp_sock   = -1;         /* shared UDP socket (mutex-gua
 static pthread_mutex_t g_udp_mu    = PTHREAD_MUTEX_INITIALIZER;
 static char           g_pubkey_path[512];
 static char           g_ui_path[512];
+static char           g_pipe_path[512];
 static int            g_port       = COCKPIT_PORT;
 
 /* -------------------------------------------------------------------------
@@ -792,6 +794,72 @@ static void* push_thread(void* arg) {
 }
 
 /* -------------------------------------------------------------------------
+ * broadcast_agent — send an AGENT frame to every authenticated session
+ * ---------------------------------------------------------------------- */
+
+static void broadcast_agent(const char* line, size_t len) {
+    if (len == 0 || len > 4095) return;  /* sanity — pipe lines are < 4096 */
+    pthread_mutex_lock(&g_sess_mu);
+    for (int i = 0; i < MAX_SESSIONS; i++) {
+        if (!g_sessions[i].active || !g_sessions[i].authenticated) continue;
+        ws_send_text(g_sessions[i].fd, line, len);
+    }
+    pthread_mutex_unlock(&g_sess_mu);
+}
+
+/* -------------------------------------------------------------------------
+ * pipe_reader_thread — reads newline-delimited AGENT frames from the named
+ * pipe written by skr8tr-agent and broadcasts them to all WS sessions.
+ *
+ * Wire format written by skr8tr-agent (one line per event):
+ *   AGENT|<tag>|<event_str>|<answer_condensed>\n
+ * ---------------------------------------------------------------------- */
+
+static void* pipe_reader_thread(void* arg) {
+    (void)arg;
+
+    if (!g_pipe_path[0]) return NULL;
+
+    /* Create the named pipe if it doesn't exist */
+    mkfifo(g_pipe_path, 0600);
+
+    fprintf(stderr, "[cockpit] Agent pipe: %s\n", g_pipe_path);
+
+    while (g_running) {
+        /* Open blocks until a writer connects — that's intentional */
+        int fd = open(g_pipe_path, O_RDONLY);
+        if (fd < 0) {
+            if (!g_running) break;
+            sleep(1);
+            continue;
+        }
+
+        char line[4096];
+        int  pos = 0;
+
+        while (g_running) {
+            char c;
+            ssize_t r = read(fd, &c, 1);
+            if (r <= 0) break;  /* writer closed pipe */
+
+            if (c == '\n') {
+                if (pos > 0) {
+                    line[pos] = '\0';
+                    broadcast_agent(line, (size_t)pos);
+                }
+                pos = 0;
+            } else if (pos < (int)sizeof(line) - 1) {
+                line[pos++] = c;
+            }
+        }
+
+        close(fd);
+    }
+
+    return NULL;
+}
+
+/* -------------------------------------------------------------------------
  * Signal handler
  * ---------------------------------------------------------------------- */
 
@@ -807,6 +875,7 @@ static void on_signal(int sig) {
 static void parse_args(int argc, char* argv[]) {
     snprintf(g_pubkey_path, sizeof(g_pubkey_path), "%s", DEFAULT_PUBKEY_PATH);
     snprintf(g_ui_path,     sizeof(g_ui_path),     "%s", DEFAULT_UI_PATH);
+    snprintf(g_pipe_path,   sizeof(g_pipe_path),   "%s", DEFAULT_PIPE_PATH);
     g_port = COCKPIT_PORT;
 
     for (int i = 1; i < argc; i++) {
@@ -816,6 +885,10 @@ static void parse_args(int argc, char* argv[]) {
             snprintf(g_ui_path, sizeof(g_ui_path), "%s", argv[++i]);
         else if (!strcmp(argv[i], "--port") && i + 1 < argc)
             g_port = (int)strtol(argv[++i], NULL, 10);
+        else if (!strcmp(argv[i], "--pipe") && i + 1 < argc)
+            snprintf(g_pipe_path, sizeof(g_pipe_path), "%s", argv[++i]);
+        else if (!strcmp(argv[i], "--no-pipe"))
+            g_pipe_path[0] = '\0';
     }
 }
 
@@ -868,11 +941,17 @@ int main(int argc, char* argv[]) {
     pthread_create(&push_tid, NULL, push_thread, NULL);
     pthread_detach(push_tid);
 
+    /* Start agent pipe reader thread */
+    pthread_t pipe_tid;
+    pthread_create(&pipe_tid, NULL, pipe_reader_thread, NULL);
+    pthread_detach(pipe_tid);
+
     printf("[cockpit] Skr8trView cockpit ready\n");
     printf("[cockpit] UI:      http://127.0.0.1:%d/\n",  g_port);
     printf("[cockpit] WS:      ws://127.0.0.1:%d/ws\n",  g_port);
     printf("[cockpit] Pubkey:  %s\n", g_pubkey_path);
     printf("[cockpit] UI dir:  %s\n", g_ui_path);
+    printf("[cockpit] Pipe:    %s\n", g_pipe_path[0] ? g_pipe_path : "(disabled)");
 
     while (g_running) {
         struct sockaddr_in cli;

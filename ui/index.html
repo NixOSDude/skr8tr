@@ -238,16 +238,41 @@
 
   /* ---- Agent feed ---- */
   #agent-feed {
-    background: var(--bg); border: 1px solid var(--border);
-    border-radius: 6px; padding: 14px 16px;
-    font-family: var(--mono); font-size: 12px;
-    line-height: 1.7; color: #cdd9e5;
-    white-space: pre-wrap;
-    min-height: 200px; max-height: calc(100vh - 200px); overflow-y: auto;
+    display: flex; flex-direction: column; gap: 10px;
+    max-height: calc(100vh - 200px); overflow-y: auto;
   }
-  .agent-event { color: var(--yellow); font-weight: 700; }
-  .agent-answer { color: var(--text); }
-  .agent-sep { color: var(--border); }
+  .agent-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 6px; padding: 12px 16px;
+  }
+  .agent-card-hd {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+  }
+  .agent-tag {
+    font-family: var(--mono); font-size: 11px; font-weight: 700;
+    padding: 2px 8px; border-radius: 4px;
+    background: #3d2e00; color: var(--yellow);
+  }
+  .agent-event-str {
+    font-family: var(--mono); font-size: 12px; color: var(--muted);
+  }
+  .agent-ts {
+    margin-left: auto; font-size: 11px; color: var(--muted);
+  }
+  .agent-answer {
+    font-family: var(--mono); font-size: 12px; line-height: 1.65;
+    color: #cdd9e5; white-space: pre-wrap;
+  }
+  .agent-empty {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 6px; padding: 32px; text-align: center;
+    color: var(--muted); font-size: 13px;
+  }
+  .agent-empty code {
+    display: block; margin-top: 12px;
+    font-family: var(--mono); font-size: 11px;
+    color: var(--accent); white-space: pre;
+  }
 
   /* ---- Empty state ---- */
   .empty { text-align: center; padding: 60px 0; color: var(--muted); font-size: 13px; }
@@ -388,18 +413,18 @@
   <div id="panel-agent" class="panel">
     <div class="section-hd">
       <h2>Agent Feed</h2>
-      <span class="count" style="font-size:11px;color:var(--muted)">skr8tr-agent events &amp; Mistral-Nemo recommendations</span>
+      <span id="agent-count" class="count">0</span>
+      <span style="font-size:11px;color:var(--muted);margin-left:4px">Mistral-Nemo recommendations</span>
       <button class="refresh-btn" onclick="clearAgent()">Clear</button>
     </div>
-    <div id="agent-feed">Waiting for agent events…
-
-Connect skr8tr-agent in watch mode to populate this feed.
-Events and Mistral-Nemo recommendations will appear here in real-time.
-
-To start the agent:
+    <div id="agent-feed">
+      <div class="agent-empty">
+        Waiting for skr8tr-agent events&hellip;
+        <code>SKRTRVIEW_PIPE=/tmp/skr8trview.pipe \
   RUST_LOG=info ./target/release/skr8tr-agent watch \
-    --interval-s 30 --index vault/skr8tr-index
-</div>
+  --interval-s 30 --index vault/skr8tr-index</code>
+      </div>
+    </div>
   </div>
 
 </div><!-- /panels -->
@@ -477,6 +502,11 @@ function handleMessage(raw) {
     lastPush = new Date();
     document.getElementById('push-status').textContent =
       'Live  ·  updated ' + lastPush.toLocaleTimeString();
+    return;
+  }
+
+  if (raw.startsWith('AGENT|')) {
+    renderAgentEvent(raw);
     return;
   }
 
@@ -703,8 +733,56 @@ function fetchLogs() {
   send('LOGS|' + app);
 }
 
+/* -----------------------------------------------------------------------
+ * Agent Feed — render an incoming AGENT|tag|event_str|answer frame
+ * --------------------------------------------------------------------- */
+let _agentCount = 0;
+
+function renderAgentEvent(raw) {
+  /* Format: AGENT|<tag>|<event_str>|<condensed_answer> */
+  const parts  = raw.split('|');
+  if (parts.length < 4) return;
+  const tag      = parts[1];
+  const evtStr   = parts[2];
+  const answer   = parts.slice(3).join('|');  /* rejoin in case answer had pipes */
+
+  const feed = document.getElementById('agent-feed');
+
+  /* Remove the empty-state placeholder on first event */
+  const empty = feed.querySelector('.agent-empty');
+  if (empty) empty.remove();
+
+  _agentCount++;
+  document.getElementById('agent-count').textContent = _agentCount;
+
+  const ts = new Date().toLocaleTimeString();
+
+  /* Render bullet-separated sentences as newlines for readability */
+  const formatted = answer.replace(/ · /g, '\n');
+
+  const card = document.createElement('div');
+  card.className = 'agent-card';
+  card.innerHTML = `
+    <div class="agent-card-hd">
+      <span class="agent-tag">${escHtml(tag)}</span>
+      <span class="agent-event-str">${escHtml(evtStr)}</span>
+      <span class="agent-ts">${ts}</span>
+    </div>
+    <div class="agent-answer">${escHtml(formatted)}</div>`;
+
+  /* Prepend so newest is at top */
+  feed.insertBefore(card, feed.firstChild);
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
 function clearAgent() {
-  document.getElementById('agent-feed').textContent = 'Feed cleared.';
+  _agentCount = 0;
+  document.getElementById('agent-count').textContent = '0';
+  const feed = document.getElementById('agent-feed');
+  feed.innerHTML = '<div class="agent-empty">Feed cleared.</div>';
 }
 
 /* -----------------------------------------------------------------------
