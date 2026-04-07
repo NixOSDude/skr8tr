@@ -4,3 +4,4 @@ cli/target/
 *.d
 *.tmp
 .DS_Store
+skrtrview.pub

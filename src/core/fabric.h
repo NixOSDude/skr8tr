@@ -16,8 +16,10 @@
 #include <stdint.h>
 #include <sys/socket.h>
 
-/* Maximum UDP datagram payload Skr8tr will send or receive */
-#define FABRIC_MTU 8192
+/* Maximum UDP datagram payload Skr8tr will send or receive.
+ * 16384 accommodates signed commands: ML-DSA-65 hex sig (6618 bytes)
+ * + command payload + timestamp field. */
+#define FABRIC_MTU 16384
 
 /* Source address filled in by fabric_recv */
 typedef struct {

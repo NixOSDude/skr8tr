@@ -34,6 +34,7 @@
  */
 
 #include "../core/fabric.h"
+#include "../core/skrauth.h"
 #include "../parser/skrmaker.h"
 
 #include <arpa/inet.h>
@@ -44,6 +45,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/select.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -62,6 +64,13 @@
 #define SCALE_DOWN_CYCLES   4    /* consecutive low-CPU heartbeats before scale-down */
 #define REBALANCE_INTERVAL  5    /* seconds between replica health checks */
 #define STATE_FILE          "/tmp/skr8tr_conductor.state"  /* persistent workload state */
+
+/* -------------------------------------------------------------------------
+ * PQC auth state — ML-DSA-65 command signing gate
+ * ---------------------------------------------------------------------- */
+
+static char g_pubkey_path[512] = {0};
+static int  g_auth_enabled     = 0;
 
 /* -------------------------------------------------------------------------
  * Node table — live view of the mesh
@@ -560,18 +569,44 @@ static void* rebalancer_thread(void* arg) {
 
 static void handle_command(const char* cmd, const FabricAddr* src,
                            char* resp, size_t resp_len) {
-    if (!strncmp(cmd, "SUBMIT|", 7)) {
-        const char* path = cmd + 7;
-        submit_workload(path, resp, resp_len);
+    /* ---------------------------------------------------------------
+     * PQC auth gate — verify ML-DSA-65 signature on mutating commands.
+     * SUBMIT and EVICT require a valid signature when auth is enabled.
+     * Read-only commands (NODES, LIST, PING) are always permitted.
+     * --------------------------------------------------------------- */
+    char bare_cmd[FABRIC_MTU];
+    const char *effective_cmd = cmd;
+
+    if (g_auth_enabled) {
+        int needs_auth = (!strncmp(cmd, "SUBMIT|", 7) ||
+                          !strncmp(cmd, "EVICT|",  6));
+        if (needs_auth) {
+            if (skrauth_verify(cmd, g_pubkey_path,
+                               bare_cmd, sizeof(bare_cmd)) != 0) {
+                fprintf(stderr,
+                        "[sched] UNAUTHORIZED command from %s — "
+                        "sign with: skr8tr --key ~/.skr8tr/signing.sec\n",
+                        src->ip);
+                snprintf(resp, resp_len,
+                         "ERR|UNAUTHORIZED — sign commands with: "
+                         "skr8tr --key ~/.skr8tr/signing.sec");
+                return;
+            }
+            effective_cmd = bare_cmd;
+        }
+    }
+
+    if (!strncmp(effective_cmd, "SUBMIT|", 7)) {
+        submit_workload(effective_cmd + 7, resp, resp_len);
         return;
     }
 
-    if (!strncmp(cmd, "EVICT|", 6)) {
-        evict_workload(cmd + 6, resp, resp_len);
+    if (!strncmp(effective_cmd, "EVICT|", 6)) {
+        evict_workload(effective_cmd + 6, resp, resp_len);
         return;
     }
 
-    if (!strcmp(cmd, "NODES")) {
+    if (!strcmp(effective_cmd, "NODES")) {
         pthread_mutex_lock(&g_nodes_mu);
         time_t now  = time(NULL);
         int    live = 0;
@@ -592,7 +627,7 @@ static void handle_command(const char* cmd, const FabricAddr* src,
         return;
     }
 
-    if (!strcmp(cmd, "LIST")) {
+    if (!strcmp(effective_cmd, "LIST")) {
         pthread_mutex_lock(&g_workloads_mu);
         int  total = 0;
         char list[4096] = {0};
@@ -615,7 +650,7 @@ static void handle_command(const char* cmd, const FabricAddr* src,
         return;
     }
 
-    if (!strcmp(cmd, "PING")) {
+    if (!strcmp(effective_cmd, "PING")) {
         snprintf(resp, resp_len, "OK|PONG|conductor");
         return;
     }
@@ -655,9 +690,32 @@ static void process_heartbeat(const char* msg, const FabricAddr* src) {
  * ---------------------------------------------------------------------- */
 
 int main(int argc, char* argv[]) {
-    (void)argc; (void)argv;
+    /* Parse --pubkey <path> */
+    for (int i = 1; i < argc - 1; i++) {
+        if (!strcmp(argv[i], "--pubkey"))
+            snprintf(g_pubkey_path, sizeof(g_pubkey_path), "%s", argv[i + 1]);
+    }
 
     printf("[sched] Skr8tr Conductor starting...\n");
+
+    /* Resolve pubkey — explicit flag, else default filename in cwd */
+    if (!g_pubkey_path[0])
+        snprintf(g_pubkey_path, sizeof(g_pubkey_path), "%s",
+                 SKRAUTH_PUBKEY_FILENAME);
+
+    struct stat _pk_st;
+    if (stat(g_pubkey_path, &_pk_st) == 0) {
+        g_auth_enabled = 1;
+        printf("[sched] PQC auth ENABLED  pubkey: %s\n", g_pubkey_path);
+        printf("[sched] SUBMIT and EVICT require ML-DSA-65 signed commands.\n");
+        printf("[sched] Operator usage:  skr8tr --key ~/.skr8tr/signing.sec up app.skr8tr\n");
+    } else {
+        g_auth_enabled = 0;
+        printf("[sched] WARNING: no pubkey found at '%s' — "
+               "running UNAUTHENTICATED (dev mode).\n", g_pubkey_path);
+        printf("[sched] Run 'skrtrkey keygen' and place skrtrview.pub "
+               "here to enable auth.\n");
+    }
 
     /* Bind command socket on 7771 */
     int cmd_sock = fabric_bind(SCHED_PORT);
