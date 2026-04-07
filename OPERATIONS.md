@@ -646,9 +646,11 @@ A node that fails to heartbeat for 15 seconds is marked dead. The Conductor:
 
 ## 8. Auto-Scaling
 
-The Conductor runs a rebalance loop every 5 seconds, reading node heartbeat metrics.
+> **Enterprise feature** — the `scale {}` manifest block is parsed in all builds but
+> the autoscale engine requires the enterprise build.
+> See [skr8tr.online/#enterprise](https://skr8tr.online/#enterprise)
 
-Configure scaling in the manifest `scale` block:
+The `scale` block syntax (accepted by the parser in all builds):
 
 ```
 app api-server
@@ -658,18 +660,10 @@ app api-server
   scale {
     min        1    # never go below 1 replica
     max        8    # never exceed 8 replicas
-    cpu-above  80   # scale UP when any node CPU% > 80 for 2 consecutive heartbeats
-    cpu-below  20   # scale DOWN when all node CPU% < 20 for 4 consecutive heartbeats
+    cpu-above  80   # scale UP threshold (enterprise engine required)
+    cpu-below  20   # scale DOWN threshold (enterprise engine required)
   }
 ```
-
-**Scale-up trigger:** Any node hosting a replica reports `cpu_pct > cpu_above` for
-2 consecutive heartbeats → add one replica on the least-loaded node.
-
-**Scale-down trigger:** All nodes report `cpu_pct < cpu_below` for 4 consecutive
-heartbeats → remove one replica (KILL sent to the most-loaded node's instance).
-
-Scale events do not exceed the `min`/`max` bounds.
 
 ---
 
@@ -943,13 +937,11 @@ skr8tr --conductor 192.168.68.51 ping
 | 7770 | UDP      | All nodes        | Heartbeat mesh — `HEARTBEAT\|id\|cpu\|ram` broadcasts |
 | 7771 | UDP      | Conductor        | Operator commands: SUBMIT, EVICT, ROLLOUT, LIST    |
 | 7772 | UDP      | Tower            | Service registry: REGISTER, LOOKUP, LIST           |
-| 7773 | UDP      | RBAC Gateway ★   | Enterprise: RBAC|team|ns|cmd|ts|sig auth gateway   |
 | 7774 | TCP      | skr8tr_serve     | Static file server (port is configurable)          |
 | 7775 | UDP      | Fleet nodes      | Node commands: LAUNCH, KILL, STATUS, LOGS          |
-| 7780 | TCP      | SSO Bridge ★     | Enterprise: POST /sso/validate → skr8trpass token  |
 | 9100 | TCP      | Fleet nodes      | Prometheus /metrics scrape endpoint                |
 
-★ Enterprise only — requires `make ENTERPRISE=1`
+Enterprise ports (RBAC gateway, SSO bridge) documented at [skr8tr.online/#enterprise](https://skr8tr.online/#enterprise)
 
 All ports are configurable at binary startup. The defaults above are the mesh
 convention — change them consistently across all daemons if you need different ports.
@@ -958,7 +950,7 @@ convention — change them consistently across all daemons if you need different
 
 ## 16. CLI Reference — `skr8tr` (Unified Operator CLI)
 
-The `skr8tr` binary is the single entry point for all Conductor and RBAC operations.
+The `skr8tr` binary is the single entry point for all Conductor operations.
 
 ### Global Flags
 
@@ -967,10 +959,6 @@ The `skr8tr` binary is the single entry point for all Conductor and RBAC operati
 | `--host <ip>` | `127.0.0.1` | Conductor IP |
 | `--port <n>` | `7771` | Conductor UDP port |
 | `--key <path>` | `~/.skr8tr/signing.sec` | ML-DSA-65 secret key for conductor auth |
-| `--team <name>` | — | RBAC team name (enables RBAC gateway mode) |
-| `--ns <ns>` | — | RBAC namespace (required with `--team`) |
-| `--rkey <path>` | `~/.skr8tr/team.sec` | Team ML-DSA-65 key for RBAC signing |
-| `--rbac-port <n>` | `7773` | RBAC gateway UDP port |
 | `--timeout <s>` | `5` | Response timeout in seconds |
 
 ### Workload Commands
@@ -1006,103 +994,8 @@ skr8tr list          # all running workloads
 skr8tr ps            # alias for list
 ```
 
-### Enterprise Namespace Commands
-
-```bash
-# List all namespaces with current usage vs quota
-skr8tr ns list
-
-# Add or update a namespace quota
-skr8tr ns add ml-team 20 40     # max 20 replicas, 40% CPU cap
-
-# Deactivate a namespace
-skr8tr ns revoke old-team
-
-# List custom autoscale rules
-skr8tr autoscale rules
-```
-
-### Enterprise RBAC Commands (via RBAC gateway on port 7773)
-
-RBAC commands require `--team` and `--rkey`. The team must have `ADMIN` permission (0x80).
-
-```bash
-# List all registered teams
-skr8tr --team admin-team --rkey ~/.skr8tr/admin.sec rbac team list
-
-# Add a new team
-skr8tr --team admin-team --rkey ~/.skr8tr/admin.sec \
-    rbac team add ml-team ml-prod 0x0f $(cat ml-team.pub.hex)
-
-# Revoke a team
-skr8tr --team admin-team --rkey ~/.skr8tr/admin.sec rbac team revoke old-team
-
-# Submit a workload through the RBAC gateway (namespace enforcement)
-skr8tr --team ml-team --ns ml-prod --rkey ~/.skr8tr/ml-team.sec \
-    up manifests/trainer.skr8tr
-```
-
----
-
-## 17. Enterprise Config Files
-
-### `/etc/skr8tr/namespaces.conf` — Multi-tenant namespace quotas
-
-```
-# name           max_replicas  cpu_quota_pct
-ml-team          20            40
-data-eng         10            25
-infra            50            80
-```
-
-### `/etc/skr8tr/autoscale.conf` — Custom metric autoscale rules
-
-```
-# app_name  metric_name              scale_up_above  scale_dn_below  min_r  max_r  cooldown_s
-trainer     skr8tr_queue_depth       100             10              1      8      60
-api         http_requests_per_second  1000           100             2      16     30
-```
-
-### `/etc/skr8tr/sso.conf` — SSO / OIDC Bridge config
-
-```
-oidc_issuer     https://accounts.google.com
-oidc_audience   skr8tr.yourcompany.com
-jwks_uri        https://www.googleapis.com/oauth2/v3/certs
-admin_group     skr8tr-admins
-user_group      skr8tr-users
-signing_key     /etc/skr8tr/sso_signing.sec
-listen_port     7780
-```
-
-### `/etc/skr8tr/rbac.conf` — RBAC team registry
-
-```
-# name:namespace:perms_hex:pubkey_hex
-admin-team:*:ff:<3904-char-pubkey-hex>
-ml-team:ml-prod:0f:<3904-char-pubkey-hex>
-data-eng:analytics:03:<3904-char-pubkey-hex>
-```
-
-Permission flags: `READ=0x01 SUBMIT=0x02 EVICT=0x04 ROLLOUT=0x08 EXEC=0x10 ADMIN=0x80`
-
-### Enterprise binary startup
-
-```bash
-# RBAC gateway (sits in front of Conductor on port 7773)
-bin/skr8tr_rbac --registry /etc/skr8tr/rbac.conf \
-                --conductor 127.0.0.1 \
-                --port 7773
-
-# Conductor with all enterprise features
-bin/skr8tr_sched --pubkey skrtrview.pub \
-                 --audit-log /var/log/skr8tr_audit.log \
-                 --syslog-host siem.internal --syslog-port 514 \
-                 --ns-config /etc/skr8tr/namespaces.conf
-
-# SSO Bridge (standalone or as a systemd service)
-bin/skr8tr_sso --config /etc/skr8tr/sso.conf
-```
+> Enterprise CLI commands (RBAC, namespaces, autoscale rules, SSO) are documented at
+> [skr8tr.online/#enterprise](https://skr8tr.online/#enterprise)
 
 ---
 
@@ -1180,37 +1073,9 @@ skr8tr --key ~/.skr8tr/signing.sec up manifests/gpu-trainer.skr8tr
 
 ---
 
-## 19. Phase 4 — AI/RAG Admin Agent (Enterprise)
+## 19. AI Admin Agent
 
-All enterprise packages include the **Skr8tr AI Admin Agent** powered by RusticAgentic RAG.
-
-> This feature uses `skr8tr-agent` from [RusticAgentic](https://github.com/NixOSDude/rusticagentic)
-> — the same codebase, no modifications required.
-
-**Capabilities:**
-- **Natural language cluster control:** `skr8tr-agent cmd "scale trainer to 5 replicas"` → generates and optionally executes the exact `skr8tr` CLI command
-- **Autonomous healing watch:** `skr8tr-agent watch` monitors the mesh for anomalies (lost nodes, dropped replicas, high CPU, stuck replicas) and generates RAG-grounded recommendations from the actual Skr8tr source code
-- **Codebase Q&A:** `skr8tr-agent ask "how does the Conductor route GPU workloads?"` — answers from your specific version's code, not documentation
-- **Auto-fix mode:** `skr8tr-agent watch --auto-fix` — safe fixes applied automatically; destructive operations presented for admin approval
-
-**Setup:**
-```bash
-# One-time: ingest the Skr8tr codebase into the RAG index
-skr8tr-agent ingest --src /path/to/skr8tr
-
-# Watch the mesh and get AI recommendations on anomalies
-skr8tr-agent watch --conductor 192.168.68.50
-
-# Ask the cluster anything in plain English
-skr8tr-agent ask "why are my api replicas dropping?"
-
-# Natural language commands (generates + optionally executes)
-skr8tr-agent cmd "show all live nodes" --execute
-skr8tr-agent cmd "evict the broken service" --team admin --rkey ~/.skr8tr/admin.sec --execute
-```
-
-**Hardware note:** Embedding inference (gte-large-en-v1.5) runs via ONNX with CUDA acceleration
-when a GPU node is present. CPU-only inference works but is slower on large codebases.
+> **Enterprise feature** — see [skr8tr.online/#enterprise](https://skr8tr.online/#enterprise)
 
 ---
 
