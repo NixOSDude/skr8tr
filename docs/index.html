@@ -621,9 +621,9 @@
 
 <!-- FEATURES -->
 <section id="features">
-  <div class="section-label">// FEATURES</div>
+  <div class="section-label">// OPEN SOURCE — APACHE 2.0 — FREE FOREVER</div>
   <h2>Everything you need.<br>Nothing you don't.</h2>
-  <p class="section-sub">Skr8tr is production-grade workload orchestration without the enterprise complexity tax.</p>
+  <p class="section-sub">Every feature below ships in the open-source build — no license key, no call required. Enterprise features (RBAC, audit ledger, SSO, multi-tenancy) are listed separately <a href="#enterprise">below</a>.</p>
   <div class="feat-grid">
     <div class="feat-card">
       <div class="feat-icon">&#x1F510;</div>
@@ -725,12 +725,16 @@
       <h3 style="color:var(--green)">Autonomous Self-Healing Mesh</h3>
       <p>Dead replicas are detected instantly via <code>SIGCHLD → DIED</code> broadcast — no polling delay. Failed health probes kill and relaunch in-place. CPU autoscale triggers scale-up/down without operator input. Restart policies enforce recovery across node reboots. The cluster heals itself — continuously, without a human in the loop.</p>
     </div>
-    <div class="feat-card" style="border-color:rgba(240,176,32,0.3);background:rgba(240,176,32,0.04);">
-      <div class="feat-icon">&#x1F4CB;</div>
-      <h3 style="color:var(--gold)">Compliance-Ready Audit Ledger</h3>
-      <p>SHA-256 mini-blockchain chains every SUBMIT, EVICT, ROLLOUT, EXEC, and AUTH_FAIL event. <strong>AES-256-GCM at-rest encryption</strong> and <strong>RFC 5424 syslog forwarding</strong> to any SIEM (Splunk, Graylog, QRadar, Sentinel) ship standard. <code>skr8tr audit-verify</code> walks the full chain in seconds.</p>
-      <p style="margin-top:0.7rem;font-size:0.78rem;color:var(--gold);font-family:var(--font-mono);">HIPAA &bull; HITRUST &bull; PCI DSS &bull; NIST 800-53 &bull; SOC 2</p>
+  </div>
+
+  <!-- Enterprise callout -->
+  <div style="margin-top:2.5rem;background:rgba(240,176,32,0.05);border:1px solid rgba(240,176,32,0.25);border-radius:12px;padding:1.8rem 2rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1.2rem;">
+    <div>
+      <div style="font-family:var(--font-mono);font-size:0.75rem;color:var(--gold);letter-spacing:0.1em;margin-bottom:0.5rem;">// ENTERPRISE ADD-ONS</div>
+      <p style="color:var(--text);font-weight:600;font-size:1rem;margin-bottom:0.3rem;">Need RBAC, Audit Ledger, SSO, or Multi-Tenancy?</p>
+      <p style="color:var(--muted);font-size:0.88rem;">Those are closed-source enterprise modules — built, tested, and ready to deploy on top of the open-source core.</p>
     </div>
+    <a class="btn-enterprise solid" href="#enterprise" style="white-space:nowrap;">See Enterprise Features &rarr;</a>
   </div>
 </section>
 
@@ -938,41 +942,118 @@ skr8tr audit-verify      <span class="comment"># walk full chain — returns OK 
 <!-- ENTERPRISE -->
 <hr class="divider" />
 <div id="enterprise" class="enterprise-section">
-  <div class="section-label">// ENTERPRISE &amp; CONSULTING</div>
-  <h2>Skip the k8s migration hell.<br>We've already done it.</h2>
+  <div class="section-label">// ENTERPRISE</div>
+  <h2>The layer enterprises require<br>before they write a check.</h2>
   <p class="section-sub">
-    Skr8tr is Apache 2.0 — free forever. For teams that want expert deployment,
-    custom integrations, or enterprise-grade features (RBAC, audit logs, SSO),
-    we offer hands-on professional services.
+    The open-source core handles orchestration, scheduling, PQC auth, and service discovery for any team.
+    Enterprise modules add the compliance, access control, and identity layers that regulated industries,
+    multi-team orgs, and Fortune 500 procurement require.
   </p>
 
-  <!-- Enterprise-only features teaser -->
-  <div class="enterprise-features-grid">
+  <!-- ── ENTERPRISE FEATURE CARDS ── -->
+  <div class="enterprise-features-grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.2rem;margin-bottom:3rem;">
     <div class="ef-card">
-      <h4>RBAC &amp; Namespaces</h4>
-      <p>Role-based access control with team namespaces, ML-DSA-65 signed per-team keys, and permission scopes: read / submit / evict / admin.</p>
+      <h4>&#x1F511; RBAC &amp; Namespaces</h4>
+      <p>Per-team ML-DSA-65 signing keys registered in a sovereign key registry. Teams are scoped to namespaces with fine-grained command ACLs: read / submit / evict / rollout / admin. One cluster, complete team isolation.</p>
+      <p style="margin-top:0.6rem;font-size:0.78rem;color:var(--gold);font-family:var(--font-mono);">ENTERPRISE ONLY</p>
     </div>
     <div class="ef-card">
-      <h4>Compliance &amp; Audit</h4>
-      <p>The audit chain (SHA-256 blockchain, AES-256-GCM encryption, RFC 5424 syslog) ships in the open-source build. Enterprise adds structured export to S3, structured JSON to Elasticsearch, and custom compliance report generation for QSA/3PAO assessments.</p>
+      <h4>&#x1F4CB; Cryptographic Audit Ledger</h4>
+      <p>SHA-256 mini-blockchain chains every SUBMIT, EVICT, ROLLOUT, EXEC, and AUTH_FAIL. AES-256-GCM at-rest encryption. <code>skr8tr audit-verify</code> walks the full chain in seconds. Tamper-evident by design — any modification breaks the chain.</p>
+      <p style="margin-top:0.6rem;font-size:0.78rem;color:var(--gold);font-family:var(--font-mono);">HIPAA &bull; HITRUST &bull; PCI DSS &bull; NIST 800-53 &bull; SOC 2 &nbsp;|&nbsp; ENTERPRISE ONLY</p>
     </div>
     <div class="ef-card">
-      <h4>SSO / OIDC</h4>
-      <p>Identity federation with your existing IdP — Okta, Azure AD, Google Workspace. Bridge OIDC tokens to ML-DSA-65 signing credentials.</p>
+      <h4>&#x1F4E1; RFC 5424 Syslog / SIEM Export</h4>
+      <p>Every audit event forwarded in real time to your SIEM over TLS — Splunk, QRadar, Microsoft Sentinel, Datadog, Graylog, or any RFC 5424-compliant receiver. Covers HIPAA § 164.312(b) centralised log collection and PCI DSS 10.5.3.</p>
+      <p style="margin-top:0.6rem;font-size:0.78rem;color:var(--gold);font-family:var(--font-mono);">ENTERPRISE ONLY</p>
     </div>
     <div class="ef-card">
-      <h4>Multi-tenant Conductor</h4>
-      <p>Resource quotas, namespace isolation, and per-team scheduling policies — run multiple product teams on one Skr8tr cluster safely.</p>
+      <h4>&#x1F510; SSO / OIDC Identity Bridge</h4>
+      <p>Federate operator identity with Okta, Azure AD / Entra ID, or Google Workspace. PKCE OAuth2 flow → IdP validates identity → bridge issues a short-lived ML-DSA-65 session credential. Group claims map directly to Skr8tr RBAC teams.</p>
+      <p style="margin-top:0.6rem;font-size:0.78rem;color:var(--gold);font-family:var(--font-mono);">ENTERPRISE ONLY</p>
+    </div>
+    <div class="ef-card">
+      <h4>&#x1F3DB;&#xFE0F; Multi-Tenant Conductor</h4>
+      <p>Namespace isolation so team A cannot see or touch team B's workloads. Per-namespace resource quotas: max replicas, max RAM, max nodes, max submit rate. Real-time enforcement — over-quota SUBMIT is rejected before it touches a node.</p>
+      <p style="margin-top:0.6rem;font-size:0.78rem;color:var(--gold);font-family:var(--font-mono);">ENTERPRISE ONLY</p>
+    </div>
+    <div class="ef-card">
+      <h4>&#x1F4C8; Custom Metric Autoscale</h4>
+      <p>The open-source core scales on CPU. Enterprise adds memory utilisation, queue depth, and arbitrary Prometheus metric triggers — plus cron-based predictive scaling for known traffic patterns. AND/OR composite rules supported.</p>
+      <p style="margin-top:0.6rem;font-size:0.78rem;color:var(--gold);font-family:var(--font-mono);">ENTERPRISE ONLY</p>
     </div>
   </div>
 
-  <!-- Services pricing cards -->
-  <div class="pricing-grid">
+  <!-- ── SUBSCRIPTION TIERS ── -->
+  <div class="section-label" style="margin-bottom:1rem;">// ENTERPRISE SUBSCRIPTIONS — MONTHLY</div>
+  <p style="color:var(--muted);font-size:0.9rem;text-align:center;margin-bottom:2rem;">
+    Compiled enterprise binaries + updates + support. No source access required. Cancel any time.
+  </p>
+
+  <div class="pricing-grid" style="margin-bottom:3rem;">
+
+    <div class="pricing-card">
+      <div class="pricing-badge">// TEAM</div>
+      <h3>Team License</h3>
+      <div class="pricing-price">$3,500 <span>/ month</span></div>
+      <p>For engineering teams operating a single Skr8tr cluster that need compliance and access control without the full enterprise stack.</p>
+      <ul class="pricing-features">
+        <li>Up to 10 nodes</li>
+        <li>RBAC &amp; Namespaces (up to 5 teams)</li>
+        <li>Cryptographic Audit Ledger + AES-256-GCM</li>
+        <li>RFC 5424 Syslog / SIEM forwarding</li>
+        <li>Email support — 1 business day SLA</li>
+        <li>Monthly binary updates</li>
+      </ul>
+      <a class="btn-enterprise" href="mailto:scott.bakerphx@gmail.com?subject=Skr8tr%20Team%20License">Start Team License &rarr;</a>
+    </div>
+
+    <div class="pricing-card featured">
+      <div class="pricing-badge">// BUSINESS — MOST POPULAR</div>
+      <h3>Business License</h3>
+      <div class="pricing-price">$7,500 <span>/ month</span></div>
+      <p>For multi-team organizations that need full identity federation, namespace isolation, and compliance reporting across departments.</p>
+      <ul class="pricing-features">
+        <li>Up to 50 nodes</li>
+        <li>Everything in Team, plus:</li>
+        <li>SSO / OIDC bridge (Okta, Azure AD, Google)</li>
+        <li>Multi-Tenant Conductor — unlimited namespaces</li>
+        <li>Custom Metric Autoscale (memory, queue, Prometheus)</li>
+        <li>Slack / Teams channel — 4-hour response SLA</li>
+        <li>Quarterly architecture review call</li>
+      </ul>
+      <a class="btn-enterprise solid" href="mailto:scott.bakerphx@gmail.com?subject=Skr8tr%20Business%20License">Start Business License &rarr;</a>
+    </div>
+
+    <div class="pricing-card">
+      <div class="pricing-badge">// STRATEGIC</div>
+      <h3>Strategic License</h3>
+      <div class="pricing-price">$15,000 <span>/ month</span></div>
+      <p>For enterprises, regulated industries, and government deployments requiring unlimited scale, SLA guarantees, and dedicated engineering support.</p>
+      <ul class="pricing-features">
+        <li>Unlimited nodes</li>
+        <li>All enterprise modules</li>
+        <li>Air-gap / on-prem deployment support</li>
+        <li>FedRAMP / FISMA advisory</li>
+        <li>Dedicated support engineer — 2-hour SLA, 24/7</li>
+        <li>Monthly architecture review + roadmap input</li>
+        <li>Custom feature development included (4 days/month)</li>
+      </ul>
+      <a class="btn-enterprise" href="mailto:scott.bakerphx@gmail.com?subject=Skr8tr%20Strategic%20License">Contact for Strategic &rarr;</a>
+    </div>
+
+  </div>
+
+  <!-- ── PROFESSIONAL SERVICES ── -->
+  <div class="section-label" style="margin-bottom:1rem;">// PROFESSIONAL SERVICES — ONE-TIME</div>
+
+  <div class="pricing-grid" style="margin-bottom:2.5rem;">
+
     <div class="pricing-card">
       <div class="pricing-badge">// CONSULTING</div>
       <h3>Cluster Setup &amp; Migration</h3>
-      <div class="pricing-price">$1,500 <span>/ day</span></div>
-      <p>We design and deploy your Skr8tr cluster — bare metal, cloud, or hybrid. Migration from Kubernetes: workload audit, manifest conversion, ingress routing, CI/CD rework, PQC key provisioning.</p>
+      <div class="pricing-price">$2,500 <span>/ day</span></div>
+      <p>We design and deploy your Skr8tr cluster — bare metal, cloud, or hybrid. Full k8s migration: workload audit, manifest conversion, ingress routing, CI/CD rework, PQC key provisioning.</p>
       <ul class="pricing-features">
         <li>Bare metal, cloud, or hybrid clusters</li>
         <li>Full k8s migration (workloads, ingress, CI/CD)</li>
@@ -985,13 +1066,13 @@ skr8tr audit-verify      <span class="comment"># walk full chain — returns OK 
     <div class="pricing-card featured">
       <div class="pricing-badge">// ARCHITECTURE REVIEW</div>
       <h3>Infrastructure Audit</h3>
-      <div class="pricing-price">$1,000 <span>flat</span></div>
-      <p>A focused 2-hour deep dive into your current orchestration stack. We identify bottlenecks, security gaps, and waste. Written recommendations delivered within 48 hours — actionable, no fluff.</p>
+      <div class="pricing-price">$3,500 <span>flat</span></div>
+      <p>A focused deep dive into your current orchestration stack. We identify bottlenecks, security gaps, and cost waste. Written report with prioritized recommendations delivered within 48 hours.</p>
       <ul class="pricing-features">
         <li>Current stack analysis (k8s, ECS, Nomad, etc.)</li>
         <li>Bottleneck + security gap identification</li>
         <li>Written report with prioritized recommendations</li>
-        <li>1 follow-up call included</li>
+        <li>1 follow-up strategy call included</li>
       </ul>
       <a class="btn-enterprise solid" href="mailto:scott.bakerphx@gmail.com?subject=Skr8tr%20Architecture%20Review">Book a Review &rarr;</a>
     </div>
@@ -999,16 +1080,17 @@ skr8tr audit-verify      <span class="comment"># walk full chain — returns OK 
     <div class="pricing-card">
       <div class="pricing-badge">// CUSTOM DEVELOPMENT</div>
       <h3>Custom Integration &amp; Feature Work</h3>
-      <div class="pricing-price">$1,500 <span>/ day</span></div>
-      <p>Need a bespoke feature — RBAC namespaces, SSO bridge, S3 audit export, custom SIEM adapter, GPU workload scheduling, or a compliance report generator for your QSA? We build it directly in C23 against your requirements.</p>
+      <div class="pricing-price">$2,500 <span>/ day</span></div>
+      <p>Bespoke enterprise features built to your requirements — SIEM adapters, compliance report generators, GPU workload scheduling, custom autoscale triggers, FedRAMP control mapping.</p>
       <ul class="pricing-features">
-        <li>Scope defined and agreed before a line of code is written</li>
-        <li>Delivered as upstream-compatible open-source or private fork</li>
+        <li>Scope agreed in writing before a line is written</li>
+        <li>Delivered as private enterprise binary or source</li>
         <li>Full documentation + integration tests included</li>
-        <li>Source handed over — no vendor lock-in, ever</li>
+        <li>Source handed over — zero vendor lock-in</li>
       </ul>
-      <a class="btn-enterprise" href="mailto:scott.bakerphx@gmail.com?subject=Skr8tr%20Custom%20Dev">Discuss Your Requirements &rarr;</a>
+      <a class="btn-enterprise" href="mailto:scott.bakerphx@gmail.com?subject=Skr8tr%20Custom%20Dev">Discuss Requirements &rarr;</a>
     </div>
+
   </div>
 
   <!-- What to provide -->
