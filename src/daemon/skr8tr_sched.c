@@ -40,6 +40,8 @@
 #ifdef ENTERPRISE
 #include "../enterprise/skr8tr_audit.h"
 #include "../enterprise/skr8tr_syslog.h"
+#include "../enterprise/skr8tr_conductor_mt.h"
+#include "../enterprise/skr8tr_autoscale.h"
 #endif
 
 #include <arpa/inet.h>
@@ -636,6 +638,23 @@ static int submit_workload(const char* manifest_path,
     int submitted = 0;
     for (SkrProc* sp = procs; sp; sp = sp->next) {
 
+#ifdef ENTERPRISE
+        /* Multi-tenant quota check — reject before touching workload table */
+        {
+            char _ns[MT_MAX_NS_NAME] = {0};
+            if (mt_app_namespace(sp->name, _ns, sizeof(_ns)) == 0) {
+                MtStatus _st = mt_quota_check(_ns);
+                if (_st != MT_OK) {
+                    snprintf(resp, resp_len,
+                             "ERR|QUOTA: namespace '%.63s': %s",
+                             _ns, mt_status_str(_st));
+                    skrmaker_free(procs);
+                    return 0;
+                }
+            }
+        }
+#endif
+
         /* Find or allocate workload slot */
         pthread_mutex_lock(&g_workloads_mu);
         Workload* wl = NULL;
@@ -685,6 +704,13 @@ static int submit_workload(const char* manifest_path,
                     snprintf(first_node_id, sizeof(first_node_id),
                              "%s", node->node_id);
                 submitted++;
+#ifdef ENTERPRISE
+                {
+                    char _ns[MT_MAX_NS_NAME] = {0};
+                    if (mt_app_namespace(sp->name, _ns, sizeof(_ns)) == 0)
+                        mt_replica_add(_ns);
+                }
+#endif
             }
         }
 
@@ -736,6 +762,13 @@ static void evict_workload(const char* app_name,
                 }
             }
             pl->active = 0;
+#ifdef ENTERPRISE
+            {
+                char _ns[MT_MAX_NS_NAME] = {0};
+                if (mt_app_namespace(app_name, _ns, sizeof(_ns)) == 0)
+                    mt_replica_remove(_ns);
+            }
+#endif
         }
         wl->active        = 0;
         wl->replica_count = 0;
@@ -981,6 +1014,126 @@ static void handle_command(const char* cmd, const FabricAddr* src,
         snprintf(resp, resp_len, "OK|PONG|conductor");
         return;
     }
+
+#ifdef ENTERPRISE
+    /* ---------------------------------------------------------------
+     * NAMESPACE_LIST — multi-tenant namespace status
+     * (enterprise only — RBAC gateway enforces ADMIN permission)
+     * --------------------------------------------------------------- */
+    if (!strcmp(effective_cmd, "NAMESPACE_LIST")) {
+        char ns_buf[4096] = {0};
+        mt_namespace_list(ns_buf, sizeof(ns_buf));
+        snprintf(resp, resp_len, "OK|NAMESPACE_LIST|%s", ns_buf);
+        return;
+    }
+
+    /* ---------------------------------------------------------------
+     * NAMESPACE_ADD|<name>|<max_replicas>|<cpu_quota_pct>
+     * --------------------------------------------------------------- */
+    if (!strncmp(effective_cmd, "NAMESPACE_ADD|", 14)) {
+        const char* p = effective_cmd + 14;
+        char ns_name[MT_MAX_NS_NAME]={0}; char max_s[16]={0}; char cpu_s[16]={0};
+        const char* sep = strchr(p, '|');
+        if (!sep) { snprintf(resp, resp_len, "ERR|NAMESPACE_ADD: missing fields"); return; }
+        size_t nl = (size_t)(sep-p); if (nl >= MT_MAX_NS_NAME) nl = MT_MAX_NS_NAME-1;
+        memcpy(ns_name, p, nl); p = sep+1;
+        sep = strchr(p, '|');
+        if (!sep) { snprintf(resp, resp_len, "ERR|NAMESPACE_ADD: missing cpu_quota"); return; }
+        size_t ml = (size_t)(sep-p); if (ml >= sizeof(max_s)) ml = sizeof(max_s)-1;
+        memcpy(max_s, p, ml); p = sep+1;
+        size_t cl = strlen(p); if (cl >= sizeof(cpu_s)) cl = sizeof(cpu_s)-1;
+        memcpy(cpu_s, p, cl);
+        int max_r = (int)strtol(max_s, NULL, 10);
+        int cpu_q = (int)strtol(cpu_s, NULL, 10);
+        if (mt_namespace_add(ns_name, max_r, cpu_q) == 0)
+            snprintf(resp, resp_len, "OK|NAMESPACE_ADDED|%.63s|max=%d|cpu=%d%%",
+                     ns_name, max_r, cpu_q);
+        else
+            snprintf(resp, resp_len, "ERR|NAMESPACE_ADD: table full");
+        return;
+    }
+
+    /* ---------------------------------------------------------------
+     * NAMESPACE_REVOKE|<name>
+     * --------------------------------------------------------------- */
+    if (!strncmp(effective_cmd, "NAMESPACE_REVOKE|", 17)) {
+        const char* ns_name = effective_cmd + 17;
+        if (mt_namespace_revoke(ns_name) == 0)
+            snprintf(resp, resp_len, "OK|NAMESPACE_REVOKED|%.63s", ns_name);
+        else
+            snprintf(resp, resp_len, "ERR|NAMESPACE_REVOKE: not found: %.63s", ns_name);
+        return;
+    }
+
+    /* ---------------------------------------------------------------
+     * AUTOSCALE_RULES — list all autoscale rules
+     * --------------------------------------------------------------- */
+    if (!strcmp(effective_cmd, "AUTOSCALE_RULES")) {
+        char as_buf[4096] = {0};
+        as_rule_list(as_buf, sizeof(as_buf));
+        snprintf(resp, resp_len, "OK|AUTOSCALE_RULES|%s", as_buf);
+        return;
+    }
+
+    /* ---------------------------------------------------------------
+     * EVICT_ONE|<app_name> — remove exactly one replica (autoscale down)
+     * --------------------------------------------------------------- */
+    if (!strncmp(effective_cmd, "EVICT_ONE|", 10)) {
+        const char* app_name = effective_cmd + 10;
+        pthread_mutex_lock(&g_workloads_mu);
+        pthread_mutex_lock(&g_nodes_mu);
+
+        int found = 0;
+        for (int w = 0; w < MAX_WORKLOADS && !found; w++) {
+            Workload* wl = &g_workloads[w];
+            if (!wl->active || strcmp(wl->app_name, app_name)) continue;
+
+            /* Remove the last active replica */
+            for (int r = MAX_REPLICAS - 1; r >= 0; r--) {
+                Placement* pl = &wl->replicas[r];
+                if (!pl->active) continue;
+                for (int n = 0; n < MAX_NODES; n++) {
+                    if (g_nodes[n].active &&
+                        !strcmp(g_nodes[n].node_id, pl->node_id)) {
+                        int send_sock = fabric_bind(0);
+                        if (send_sock >= 0) {
+                            char cmd[256];
+                            snprintf(cmd, sizeof(cmd),
+                                     "KILL|%.127s", app_name);
+                            fabric_send(send_sock, g_nodes[n].ip,
+                                        NODE_CMD_PORT, cmd, strlen(cmd));
+                            close(send_sock);
+                        }
+                        if (pl->port > 0)
+                            node_port_release(&g_nodes[n], pl->port);
+                        break;
+                    }
+                }
+                pl->active = 0;
+#ifdef ENTERPRISE
+                {
+                    char _ns[MT_MAX_NS_NAME] = {0};
+                    if (mt_app_namespace(app_name, _ns, sizeof(_ns)) == 0)
+                        mt_replica_remove(_ns);
+                }
+#endif
+                found = 1;
+                break;
+            }
+        }
+
+        pthread_mutex_unlock(&g_nodes_mu);
+        pthread_mutex_unlock(&g_workloads_mu);
+
+        if (found) {
+            snprintf(resp, resp_len, "OK|EVICT_ONE|%.127s", app_name);
+            state_save();
+        } else {
+            snprintf(resp, resp_len, "ERR|EVICT_ONE: not found: %.127s", app_name);
+        }
+        return;
+    }
+#endif
 
     /* ---------------------------------------------------------------
      * EXEC|<app_name>|<shell_cmd>
@@ -1279,6 +1432,7 @@ int main(int argc, char* argv[]) {
     int         syslog_port   = 0;
     int         syslog_tls    = 0;
     const char* syslog_ca     = NULL;
+    const char* ns_config     = NULL;   /* --ns-config <path> */
 #endif
 
     for (int i = 1; i < argc; i++) {
@@ -1291,6 +1445,7 @@ int main(int argc, char* argv[]) {
             if (!strcmp(argv[i], "--syslog-host")) syslog_host = argv[i + 1];
             if (!strcmp(argv[i], "--syslog-port")) syslog_port = atoi(argv[i + 1]);
             if (!strcmp(argv[i], "--syslog-ca"))  syslog_ca   = argv[i + 1];
+            if (!strcmp(argv[i], "--ns-config"))  ns_config   = argv[i + 1];
 #endif
         }
 #ifdef ENTERPRISE
@@ -1313,6 +1468,19 @@ int main(int argc, char* argv[]) {
         else
             fprintf(stderr, "[sched] WARNING: syslog init failed — "
                     "events will not be forwarded to SIEM\n");
+    }
+
+    /* Multi-tenant namespace registry */
+    mt_load_config(ns_config);   /* NULL → MT_NS_CONFIG_PATH default */
+
+    /* Custom metric autoscale engine */
+    as_load_config(NULL);        /* NULL → AS_CONFIG_PATH default */
+    {
+        static pthread_t as_tid;
+        if (pthread_create(&as_tid, NULL, as_thread, NULL) == 0)
+            pthread_detach(as_tid);
+        else
+            fprintf(stderr, "[sched] WARNING: autoscale thread failed to start\n");
     }
 #endif
 

@@ -40,6 +40,9 @@ all: $(BIN) \
      $(BIN)/skr8tr_serve \
      $(BIN)/skr8tr_ingress \
      $(BIN)/skrtrkey
+ifdef ENTERPRISE
+all: $(BIN)/skr8tr_rbac $(BIN)/skr8tr_sso
+endif
 
 $(BIN):
 	mkdir -p $(BIN)
@@ -52,7 +55,9 @@ SCHED_SRCS = $(SRC)/daemon/skr8tr_sched.c $(SRC)/core/fabric.c \
              $(SRC)/core/skrauth.c $(SRC)/parser/skrmaker.c
 ifdef ENTERPRISE
   SCHED_SRCS += $(SRC)/enterprise/skr8tr_audit.c \
-                $(SRC)/enterprise/skr8tr_syslog.c
+                $(SRC)/enterprise/skr8tr_syslog.c \
+                $(SRC)/enterprise/skr8tr_conductor_mt.c \
+                $(SRC)/enterprise/skr8tr_autoscale.c
 endif
 
 $(BIN)/skr8tr_sched: $(SCHED_SRCS)
@@ -69,6 +74,12 @@ $(BIN)/skr8tr_ingress: $(SRC)/daemon/skr8tr_ingress.c $(SRC)/core/fabric.c
 
 $(BIN)/skrtrkey: $(SRC)/tools/skrtrkey.c $(SRC)/core/skrauth.c
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+$(BIN)/skr8tr_rbac: $(SRC)/enterprise/skr8tr_rbac.c $(SRC)/core/fabric.c
+	$(CC) $(CFLAGS) -I./src/enterprise $^ -o $@ $(LDFLAGS) -lssl -lcrypto
+
+$(BIN)/skr8tr_sso: $(SRC)/enterprise/skr8tr_sso.c
+	$(CC) $(CFLAGS) -I./src/enterprise $^ -o $@ $(LDFLAGS) -lssl -lcrypto
 
 clean:
 	rm -rf $(BIN)
