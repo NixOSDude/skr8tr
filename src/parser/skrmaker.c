@@ -253,6 +253,28 @@ static int parse_env(Parser* p, SkrProc* proc, int parent_indent) {
     return 1;
 }
 
+static int parse_secret(Parser* p, SkrProc* proc, int parent_indent) {
+    char* line;
+    while ((line = read_line(p))) {
+        char* s = ltrim(line);
+        if (*s == '}') return 1;
+        int ind = indent_of(line);
+        if (ind <= parent_indent) { push_back(p); return 1; }
+
+        char* key; char* val;
+        split_kv(line, &key, &val);
+
+        if (proc->secret_count < SKRMAKER_MAX_SECRETS) {
+            int i = proc->secret_count++;
+            strncpy(proc->secrets[i].key, key,
+                    sizeof(proc->secrets[i].key) - 1);
+            strncpy(proc->secrets[i].val, val,
+                    sizeof(proc->secrets[i].val) - 1);
+        }
+    }
+    return 1;
+}
+
 static int parse_vm(Parser* p, SkrProc* proc, int parent_indent) {
     char* line;
     while ((line = read_line(p))) {
@@ -314,6 +336,7 @@ static int parse_app(Parser* p, SkrProc* proc) {
         else if (!strcmp(key, "health")) parse_health(p, proc, app_indent);
         else if (!strcmp(key, "scale"))  parse_scale(p, proc, app_indent);
         else if (!strcmp(key, "env"))    parse_env(p, proc, app_indent);
+        else if (!strcmp(key, "secret")) parse_secret(p, proc, app_indent);
         else if (!strcmp(key, "vm"))     parse_vm(p, proc, app_indent);
         /* unknown keys silently accepted for forward compatibility */
     }

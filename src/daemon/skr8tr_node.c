@@ -652,6 +652,13 @@ static pid_t launch_proc(const SkrProc* lp, char* err, size_t err_len) {
             }
             if (injected_env)
                 for (int i = 0; injected_env[i]; i++) putenv(injected_env[i]);
+            /* Inject secrets post-fork — never logged, never in UDP payload */
+            for (int si = 0; si < lp->secret_count; si++) {
+                char kv[SKRMAKER_ENV_KEY + SKRMAKER_ENV_VAL + 2];
+                snprintf(kv, sizeof(kv), "%s=%s",
+                         lp->secrets[si].key, lp->secrets[si].val);
+                putenv(strdup(kv));   /* must survive after this block */
+            }
             execv(bin, argv_exec);
             fprintf(stderr, "[node] exec failed '%s': %s\n",
                     bin, strerror(errno));

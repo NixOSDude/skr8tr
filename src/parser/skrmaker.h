@@ -26,8 +26,9 @@
 #define SKRMAKER_URL_LEN    256
 #define SKRMAKER_ENV_KEY    64
 #define SKRMAKER_ENV_VAL    256
-#define SKRMAKER_MAX_RUNS   16
-#define SKRMAKER_MAX_ENV    64
+#define SKRMAKER_MAX_RUNS    16
+#define SKRMAKER_MAX_ENV     64
+#define SKRMAKER_MAX_SECRETS 32
 
 /* -------------------------------------------------------------------------
  * Workload type
@@ -76,6 +77,18 @@ typedef struct {
     char val[SKRMAKER_ENV_VAL];
 } SkrtrEnvVar;
 
+/* Secret env vars — same wire shape as SkrtrEnvVar but:
+ *   - never included in LAUNCH UDP command strings
+ *   - never logged by node or conductor
+ *   - injected directly into child process env after fork
+ * The manifest `secret {}` block is stored in a separate file:
+ *   <manifest_basename>.secrets (not committed to the main manifest)
+ * or declared inline in the .skr8tr file for dev-mode convenience. */
+typedef struct {
+    char key[SKRMAKER_ENV_KEY];
+    char val[SKRMAKER_ENV_VAL];
+} SkrtrSecret;
+
 /* VM configuration — only populated when workload_type == SKRTR_TYPE_VM */
 typedef struct {
     char hypervisor[SKRMAKER_PATH_LEN]; /* path: qemu-system-x86_64 or firecracker */
@@ -119,6 +132,10 @@ typedef struct SkrProc {
     /* environment variables */
     SkrtrEnvVar        env[SKRMAKER_MAX_ENV];
     int                env_count;
+
+    /* secret environment variables — injected post-fork, never logged */
+    SkrtrSecret        secrets[SKRMAKER_MAX_SECRETS];
+    int                secret_count;
 
     /* linked list */
     struct SkrProc*    next;

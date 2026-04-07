@@ -953,6 +953,92 @@ static void handle_command(const char* cmd, const FabricAddr* src,
         return;
     }
 
+    /* ---------------------------------------------------------------
+     * LOGS|<app_name>
+     * Aggregate log output from every node hosting a replica of the app.
+     * Queries each node's CMD port sequentially, combines the ring
+     * buffers, and returns the result in one response datagram.
+     * --------------------------------------------------------------- */
+    if (!strncmp(effective_cmd, "LOGS|", 5)) {
+        const char* app_name = effective_cmd + 5;
+
+        pthread_mutex_lock(&g_workloads_mu);
+        pthread_mutex_lock(&g_nodes_mu);
+
+        /* Collect active placements for this app */
+        char  node_ips[MAX_REPLICAS][INET_ADDRSTRLEN];
+        int   node_count = 0;
+
+        for (int w = 0; w < MAX_WORKLOADS && node_count < MAX_REPLICAS; w++) {
+            Workload* wl = &g_workloads[w];
+            if (!wl->active || strcmp(wl->app_name, app_name)) continue;
+            for (int r = 0; r < MAX_REPLICAS && node_count < MAX_REPLICAS; r++) {
+                Placement* pl = &wl->replicas[r];
+                if (!pl->active) continue;
+                NodeEntry* nd = node_find(pl->node_id);
+                if (nd) {
+                    snprintf(node_ips[node_count], INET_ADDRSTRLEN,
+                             "%s", nd->ip);
+                    node_count++;
+                }
+            }
+        }
+
+        pthread_mutex_unlock(&g_nodes_mu);
+        pthread_mutex_unlock(&g_workloads_mu);
+
+        if (node_count == 0) {
+            snprintf(resp, resp_len, "ERR|no running replicas: %.127s",
+                     app_name);
+            return;
+        }
+
+        /* Query each node and aggregate */
+        char agg[FABRIC_MTU - 256];
+        int  agg_len = 0;
+        agg[0] = '\0';
+
+        for (int ni = 0; ni < node_count; ni++) {
+            int lsock = fabric_bind(0);
+            if (lsock < 0) continue;
+
+            struct timeval tv = { .tv_sec = 3, .tv_usec = 0 };
+            setsockopt(lsock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+            char query[256];
+            snprintf(query, sizeof(query), "LOGS|%.127s", app_name);
+            fabric_send(lsock, node_ips[ni], NODE_CMD_PORT,
+                        query, strlen(query));
+
+            char node_resp[FABRIC_MTU] = {0};
+            int  rn = fabric_recv(lsock, node_resp, sizeof(node_resp) - 1,
+                                  NULL);
+            close(lsock);
+            if (rn <= 0) continue;
+            node_resp[rn] = '\0';
+
+            /* Format: OK|LOGS|<name>|<count>|<lines> */
+            if (strncmp(node_resp, "OK|LOGS|", 8)) continue;
+            char* p = node_resp + 8;
+            /* skip name field */
+            char* f1 = strchr(p, '|'); if (!f1) continue;
+            /* skip count field */
+            char* f2 = strchr(f1 + 1, '|'); if (!f2) continue;
+            const char* lines = f2 + 1;
+
+            int written = snprintf(agg + agg_len,
+                                   sizeof(agg) - (size_t)agg_len,
+                                   "=== node %s ===\n%s",
+                                   node_ips[ni], lines);
+            if (written > 0) agg_len += written;
+            if (agg_len >= (int)sizeof(agg) - 1) break;
+        }
+
+        snprintf(resp, resp_len, "OK|LOGS|%.127s|%d|%s",
+                 app_name, node_count, agg);
+        return;
+    }
+
     snprintf(resp, resp_len, "ERR|unknown command");
     (void)src;
 }
