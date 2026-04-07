@@ -506,3 +506,53 @@ Phase 16: TLS termination in skr8tr_ingress (self-signed or ACME) — optional u
 ### Next Milestone
 Phase 2: `skr8tr exec <app> <cmd>` — remote shell into running replica  
 OR: HTTP/2 + ALPN in ingress (h2 over TLS — nghttp2 or custom frame parser)
+
+---
+
+## 2026-04-07 — Phase 2A–2E: Complete Enterprise Suite
+
+### Phase 2A — Open-Source Feature Parity (all features website claims now real)
+- **Prometheus /metrics**: TCP 9100 HTTP thread on every skr8tr_node — counters per-app, restarts, CPU
+- **Persistent volumes**: `volume {}` block in manifest → host_path mkdir + env var injection post-fork
+- **Restart policy**: `restart always|on-failure|never` — SKRTR_RESTART_* enum, relaunch with 1s cooldown
+- **Graceful drain**: `drain Ns` → SIGTERM → sleep(N) → SIGKILL, `killed_intentionally` flag prevents DIED
+- **DIED broadcast**: `DIED|name|node_id|exit_code` UDP to Conductor on unexpected exit
+- **EXEC command**: `EXEC|app|cmd` → fork sh -c → capture stdout → `OK|EXEC|app|output`
+
+### Phase 2B — RBAC Gateway
+- `src/enterprise/skr8tr_rbac.c` + `.h` — complete, zero-warning build
+- UDP 7773 — ML-DSA-65 per-team pubkey registry, namespace isolation, command ACL bitmask
+- Admin commands: TEAM_ADD, TEAM_REVOKE, TEAM_LIST (all ML-DSA-65 signed)
+- Atomic registry save via .tmp rename, SIGHUP reload
+
+### Phase 2C — Multi-Tenant Conductor
+- `src/enterprise/skr8tr_conductor_mt.c` + `.h` — complete
+- Namespace quota enforcement: max_replicas, cpu_quota_pct per namespace
+- `mt_quota_check()` injected into SUBMIT before replica launch
+- `mt_replica_add/remove()` called on launch/evict/death
+- Commands: NAMESPACE_LIST, NAMESPACE_ADD, NAMESPACE_REVOKE
+
+### Phase 2D — SSO / OIDC Bridge
+- `src/enterprise/skr8tr_sso.c` + `.h` — complete, zero-warning build
+- HTTP/1.1 TCP 7780 — POST /sso/validate receives OIDC JWT
+- Validates RS256 via JWKS fetch (with TTL cache), checks issuer/audience/expiry/groups
+- Issues ML-DSA-65 signed **skr8trpass** session token (role + sub + exp + sig)
+- `sso_verify_token()` for Shepherd Gateway validation
+
+### Phase 2E — Custom Metric Autoscale
+- `src/enterprise/skr8tr_autoscale.c` + `.h` — complete
+- Background thread scrapes Prometheus /metrics from every node hosting a replica
+- Configurable per-app rules: metric_name, up_above, dn_below, min/max replicas, cooldown_s
+- Issues SUBMIT (scale up) or EVICT_ONE (scale down) to local Conductor
+- EVICT_ONE command added to Conductor: removes exactly one replica, preserves min_replicas
+
+### Build Verification
+```
+make ENTERPRISE=1 clean && make ENTERPRISE=1
+# 8 binaries, zero warnings: skr8tr_node skr8tr_sched skr8tr_reg skr8tr_serve
+#                              skr8tr_ingress skrtrkey skr8tr_rbac skr8tr_sso
+```
+
+### Enterprise Repo Synced
+- `gitea/skr8tr-enterprise` updated — all 6 modules now have full implementations
+- `gitea/skr8tr` private repo updated with all enterprise source
