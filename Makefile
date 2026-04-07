@@ -6,13 +6,18 @@ CC      = gcc
 CFLAGS  = -O3 -Wall -Wextra -std=gnu23 -I./src/core
 LDFLAGS = -lpthread -loqs
 
-OQS_INC ?= $(shell pkg-config --variable=includedir liboqs 2>/dev/null || \
-             find /nix/store -name "oqs.h" 2>/dev/null | head -1 | xargs dirname | xargs dirname)
-OQS_LIB ?= $(shell pkg-config --libs-only-L liboqs 2>/dev/null | sed 's/-L//' || \
-             find /nix/store -name "liboqs.so" 2>/dev/null | head -1 | xargs dirname 2>/dev/null)
+OQS_INC ?= $(shell pkg-config --variable=includedir liboqs 2>/dev/null)
+ifeq ($(OQS_INC),)
+OQS_INC := $(shell find /nix/store -name "oqs.h" 2>/dev/null | head -1 | xargs dirname 2>/dev/null | xargs dirname 2>/dev/null)
+endif
+
+OQS_LIB ?= $(shell pkg-config --variable=libdir liboqs 2>/dev/null)
+ifeq ($(OQS_LIB),)
+OQS_LIB := $(shell find /nix/store -name "liboqs.so" 2>/dev/null | head -1 | xargs dirname 2>/dev/null)
+endif
 
 ifneq ($(OQS_INC),)
-  CFLAGS  += -I$(OQS_INC)/include
+  CFLAGS  += -I$(OQS_INC)
   LDFLAGS += -L$(OQS_LIB)
 endif
 
@@ -47,7 +52,7 @@ $(BIN)/skr8tr_serve: $(SRC)/server/skr8tr_serve.c
 	$(CC) $(CFLAGS) $^ -o $@ -lpthread
 
 $(BIN)/skr8tr_ingress: $(SRC)/daemon/skr8tr_ingress.c $(SRC)/core/fabric.c
-	$(CC) $(CFLAGS) $^ -o $@ -lpthread
+	$(CC) $(CFLAGS) $^ -o $@ -lpthread -lssl -lcrypto
 
 $(BIN)/skrtrkey: $(SRC)/tools/skrtrkey.c $(SRC)/core/skrauth.c
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)

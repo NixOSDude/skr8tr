@@ -25,9 +25,12 @@
  *     --route /api:api-service \
  *     --route /:frontend
  *
- * Note: TLS termination is handled at the cloud load balancer (AWS ALB,
- * GCP HTTPS LB, Cloudflare). The ingress speaks plain HTTP internally,
- * which is the standard production pattern.
+ * TLS termination (opt-in):
+ *   --tls-cert <path>  PEM certificate file
+ *   --tls-key  <path>  PEM private key file
+ *   When both are provided, the ingress terminates TLS (HTTPS on --listen port).
+ *   Backend connections are always plain HTTP — TLS terminates at the ingress.
+ *   When omitted, plain HTTP mode (suitable behind a cloud LB).
  */
 
 #include "../core/fabric.h"
@@ -45,6 +48,10 @@
 #include <sys/socket.h>
 #include <time.h>
 #include <unistd.h>
+
+/* TLS — OpenSSL (opt-in; compiled in, disabled at runtime when no cert/key) */
+#include <openssl/ssl.h>
+#include <openssl/err.h>
 
 /* -------------------------------------------------------------------------
  * Constants
@@ -73,6 +80,11 @@ static Route g_routes[MAX_ROUTES];
 static int   g_route_count  = 0;
 static char  g_tower_host[64] = "127.0.0.1";
 static int   g_listen_port    = INGRESS_PORT_DEFAULT;
+
+/* TLS state — NULL when running in plain HTTP mode */
+static SSL_CTX* g_ssl_ctx   = NULL;
+static char g_tls_cert[512] = {0};
+static char g_tls_key[512]  = {0};
 
 /* -------------------------------------------------------------------------
  * Route matching — longest prefix wins
@@ -157,15 +169,47 @@ static int backend_connect(const char* ip, int port) {
 }
 
 /* -------------------------------------------------------------------------
- * Proxy loop — bidirectional byte forwarding between client and backend
+ * TLS client I/O wrappers
+ *
+ * When ssl != NULL, use OpenSSL read/write on the client socket.
+ * Backend connections are always plain TCP regardless of TLS mode.
  * ---------------------------------------------------------------------- */
 
-static void proxy_forward(int client_fd, int backend_fd) {
+static ssize_t client_read(int fd, SSL* ssl, void* buf, size_t len) {
+    if (ssl) {
+        int r = SSL_read(ssl, buf, (int)len);
+        return (r > 0) ? (ssize_t)r : -1;
+    }
+    return recv(fd, buf, len, 0);
+}
+
+static ssize_t client_write(int fd, SSL* ssl, const void* buf, size_t len) {
+    if (ssl) {
+        int r = SSL_write(ssl, buf, (int)len);
+        return (r > 0) ? (ssize_t)r : -1;
+    }
+    return send(fd, buf, len, MSG_NOSIGNAL);
+}
+
+/* -------------------------------------------------------------------------
+ * Proxy loop — bidirectional byte forwarding between client and backend.
+ * Client side uses TLS when ssl != NULL; backend is always plain TCP.
+ * ---------------------------------------------------------------------- */
+
+static void proxy_forward(int client_fd, int backend_fd, SSL* ssl) {
     fd_set rfds;
     char buf[8192];
     int max_fd = client_fd > backend_fd ? client_fd : backend_fd;
 
     for (;;) {
+        /* Drain any TLS-layer-buffered data before blocking on select() */
+        if (ssl && SSL_pending(ssl) > 0) {
+            ssize_t n = client_read(client_fd, ssl, buf, sizeof(buf));
+            if (n <= 0) break;
+            if (send(backend_fd, buf, (size_t)n, MSG_NOSIGNAL) <= 0) break;
+            continue;
+        }
+
         FD_ZERO(&rfds);
         FD_SET(client_fd,  &rfds);
         FD_SET(backend_fd, &rfds);
@@ -175,14 +219,14 @@ static void proxy_forward(int client_fd, int backend_fd) {
         if (ready <= 0) break;
 
         if (FD_ISSET(client_fd, &rfds)) {
-            ssize_t n = recv(client_fd, buf, sizeof(buf), 0);
+            ssize_t n = client_read(client_fd, ssl, buf, sizeof(buf));
             if (n <= 0) break;
             if (send(backend_fd, buf, (size_t)n, MSG_NOSIGNAL) <= 0) break;
         }
         if (FD_ISSET(backend_fd, &rfds)) {
             ssize_t n = recv(backend_fd, buf, sizeof(buf), 0);
             if (n <= 0) break;
-            if (send(client_fd, buf, (size_t)n, MSG_NOSIGNAL) <= 0) break;
+            if (client_write(client_fd, ssl, buf, (size_t)n) <= 0) break;
         }
     }
 }
@@ -191,11 +235,12 @@ static void proxy_forward(int client_fd, int backend_fd) {
  * Connection handler — one thread per accepted connection
  * ---------------------------------------------------------------------- */
 
-typedef struct { int fd; char ip[INET_ADDRSTRLEN]; } ConnArg;
+typedef struct { int fd; char ip[INET_ADDRSTRLEN]; SSL* ssl; } ConnArg;
 
 static void* handle_connection(void* arg) {
     ConnArg* ca = arg;
-    int client_fd = ca->fd;
+    int  client_fd = ca->fd;
+    SSL* ssl       = ca->ssl;
     char client_ip[INET_ADDRSTRLEN];
     snprintf(client_ip, sizeof(client_ip), "%s", ca->ip);
     free(ca);
@@ -205,7 +250,7 @@ static void* handle_connection(void* arg) {
     int  head_len   = 0;
 
     while (head_len < (int)sizeof(head) - 1) {
-        ssize_t n = recv(client_fd, head + head_len, 1, 0);
+        ssize_t n = client_read(client_fd, ssl, head + head_len, 1);
         if (n <= 0) goto done;
         head_len++;
         /* Stop reading headers when we hit the blank line \r\n\r\n */
@@ -232,7 +277,7 @@ static void* handle_connection(void* arg) {
         const char* r404 = "HTTP/1.1 404 Not Found\r\n"
                            "Content-Length: 24\r\n\r\n"
                            "No route for this path.\n";
-        send(client_fd, r404, strlen(r404), MSG_NOSIGNAL);
+        client_write(client_fd, ssl, r404, strlen(r404));
         goto done;
     }
 
@@ -253,7 +298,7 @@ static void* handle_connection(void* arg) {
                 const char* r503 = "HTTP/1.1 503 Service Unavailable\r\n"
                                    "Content-Length: 27\r\n\r\n"
                                    "Service not found in Tower\n";
-                send(client_fd, r503, strlen(r503), MSG_NOSIGNAL);
+                client_write(client_fd, ssl, r503, strlen(r503));
             }
             continue;
         }
@@ -277,10 +322,14 @@ static void* handle_connection(void* arg) {
     send(backend_fd, eol + 2, (size_t)(head_len - (int)line_len), MSG_NOSIGNAL);
 
     /* Bidirectional proxy */
-    proxy_forward(client_fd, backend_fd);
+    proxy_forward(client_fd, backend_fd, ssl);
     close(backend_fd);
 
 done:
+    if (ssl) {
+        SSL_shutdown(ssl);
+        SSL_free(ssl);
+    }
     close(client_fd);
     return NULL;
 }
@@ -292,13 +341,20 @@ done:
 static void usage(void) {
     fprintf(stderr,
         "usage: skr8tr_ingress [options]\n"
-        "  --listen <port>              TCP listen port (default: 80)\n"
-        "  --tower  <host>              Tower host (default: 127.0.0.1)\n"
-        "  --route  <prefix>:<service>  Add route (longest prefix wins)\n"
-        "  --workers <n>                Max concurrent connections (default: 64)\n"
+        "  --listen   <port>              TCP listen port (default: 80)\n"
+        "  --tower    <host>              Tower host (default: 127.0.0.1)\n"
+        "  --route    <prefix>:<service>  Add route (longest prefix wins)\n"
+        "  --workers  <n>                 Max concurrent connections (default: 64)\n"
+        "  --tls-cert <path>              PEM certificate (enables HTTPS)\n"
+        "  --tls-key  <path>              PEM private key  (enables HTTPS)\n"
         "\n"
-        "example:\n"
+        "example (plain HTTP):\n"
         "  skr8tr_ingress --route /api:api-service --route /:frontend\n"
+        "\n"
+        "example (HTTPS):\n"
+        "  skr8tr_ingress --tls-cert /etc/skr8tr/tls.crt"
+        " --tls-key /etc/skr8tr/tls.key \\\n"
+        "    --listen 443 --route /:frontend\n"
     );
 }
 
@@ -314,6 +370,10 @@ int main(int argc, char* argv[]) {
             snprintf(g_tower_host, sizeof(g_tower_host), "%s", argv[++i]);
         } else if (!strcmp(argv[i], "--workers") && i + 1 < argc) {
             max_workers = (int)strtol(argv[++i], NULL, 10);
+        } else if (!strcmp(argv[i], "--tls-cert") && i + 1 < argc) {
+            snprintf(g_tls_cert, sizeof(g_tls_cert), "%s", argv[++i]);
+        } else if (!strcmp(argv[i], "--tls-key") && i + 1 < argc) {
+            snprintf(g_tls_key, sizeof(g_tls_key), "%s", argv[++i]);
         } else if (!strcmp(argv[i], "--route") && i + 1 < argc) {
             if (g_route_count >= MAX_ROUTES) {
                 fprintf(stderr, "[ingress] too many routes (max %d)\n",
@@ -353,9 +413,48 @@ int main(int argc, char* argv[]) {
                 g_routes[j] = tmp;
             }
 
+    /* TLS initialization — only when both cert and key are provided */
+    if (g_tls_cert[0] && g_tls_key[0]) {
+        SSL_library_init();
+        OpenSSL_add_all_algorithms();
+        SSL_load_error_strings();
+
+        g_ssl_ctx = SSL_CTX_new(TLS_server_method());
+        if (!g_ssl_ctx) {
+            fprintf(stderr, "[ingress] FATAL: SSL_CTX_new failed\n");
+            ERR_print_errors_fp(stderr);
+            return 1;
+        }
+        if (SSL_CTX_use_certificate_file(g_ssl_ctx, g_tls_cert,
+                                          SSL_FILETYPE_PEM) != 1) {
+            fprintf(stderr, "[ingress] FATAL: cannot load cert: %s\n",
+                    g_tls_cert);
+            ERR_print_errors_fp(stderr);
+            return 1;
+        }
+        if (SSL_CTX_use_PrivateKey_file(g_ssl_ctx, g_tls_key,
+                                         SSL_FILETYPE_PEM) != 1) {
+            fprintf(stderr, "[ingress] FATAL: cannot load key: %s\n",
+                    g_tls_key);
+            ERR_print_errors_fp(stderr);
+            return 1;
+        }
+        if (SSL_CTX_check_private_key(g_ssl_ctx) != 1) {
+            fprintf(stderr, "[ingress] FATAL: cert/key mismatch\n");
+            ERR_print_errors_fp(stderr);
+            return 1;
+        }
+        /* Prefer server cipher ordering; disable deprecated protocols */
+        SSL_CTX_set_options(g_ssl_ctx,
+            SSL_OP_CIPHER_SERVER_PREFERENCE |
+            SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_NO_TLSv1 |
+            SSL_OP_NO_TLSv1_1);
+    }
+
     printf("[ingress] Skr8tr Ingress starting...\n");
-    printf("[ingress] listen: TCP:%d  tower: %s:%d  workers: %d\n",
-           g_listen_port, g_tower_host, TOWER_PORT, max_workers);
+    printf("[ingress] listen: TCP:%d  tower: %s:%d  workers: %d  tls: %s\n",
+           g_listen_port, g_tower_host, TOWER_PORT, max_workers,
+           g_ssl_ctx ? "enabled" : "disabled");
     for (int i = 0; i < g_route_count; i++)
         printf("[ingress] route: %-32s → %s\n",
                g_routes[i].prefix, g_routes[i].service);
@@ -421,11 +520,34 @@ int main(int argc, char* argv[]) {
 
         ConnArg* ca = malloc(sizeof(ConnArg));
         if (!ca) { close(client_fd); continue; }
-        ca->fd = client_fd;
+        ca->fd  = client_fd;
+        ca->ssl = NULL;
         inet_ntop(AF_INET, &client_addr.sin_addr, ca->ip, sizeof(ca->ip));
+
+        /* TLS handshake — performed synchronously before spawning thread
+         * so the thread receives a fully established SSL* or NULL. */
+        if (g_ssl_ctx) {
+            SSL* ssl = SSL_new(g_ssl_ctx);
+            if (!ssl || SSL_set_fd(ssl, client_fd) != 1) {
+                if (ssl) SSL_free(ssl);
+                free(ca); close(client_fd);
+                pthread_mutex_lock(&active_mu); active--;
+                pthread_mutex_unlock(&active_mu);
+                continue;
+            }
+            if (SSL_accept(ssl) != 1) {
+                SSL_free(ssl);
+                free(ca); close(client_fd);
+                pthread_mutex_lock(&active_mu); active--;
+                pthread_mutex_unlock(&active_mu);
+                continue;
+            }
+            ca->ssl = ssl;
+        }
 
         pthread_t tid;
         if (pthread_create(&tid, &attr, handle_connection, ca) != 0) {
+            if (ca->ssl) { SSL_shutdown(ca->ssl); SSL_free(ca->ssl); }
             free(ca); close(client_fd);
             pthread_mutex_lock(&active_mu); active--; pthread_mutex_unlock(&active_mu);
         }

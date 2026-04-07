@@ -39,12 +39,14 @@
 
 #include <arpa/inet.h>
 #include <errno.h>
+#include <netinet/in.h>
 #include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/select.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
@@ -148,11 +150,60 @@ static int        launch_replica(Workload* wl, NodeEntry* node);
  * Runs in a dedicated thread so the main loop stays responsive.
  * ---------------------------------------------------------------------- */
 
-#define ROLLOUT_WAIT_S  8   /* seconds to wait after launch before killing old */
+#define ROLLOUT_WAIT_S           8    /* fixed settle window — fallback when no health check */
+#define ROLLOUT_READY_TIMEOUT_S  120  /* max seconds to poll readiness probe per replica */
+#define ROLLOUT_PROBE_INTERVAL_S 2    /* seconds between readiness probe attempts */
 
 typedef struct {
     char manifest_path[512];
 } RolloutArg;
+
+/* -------------------------------------------------------------------------
+ * HTTP readiness probe — TCP connect to ip:port, issue an HTTP GET, verify
+ * the response status code matches.  Mirrors health_probe() on the node but
+ * targets a remote host so the Conductor can drive rollout gating.
+ *
+ * check_str format: "GET /path <expected_code>"
+ * Returns 1 on success, 0 on any failure (connect, timeout, wrong code).
+ * ---------------------------------------------------------------------- */
+
+static int remote_health_probe(const char* ip, int port,
+                                const char* check_str) {
+    char method[16], path[256]; int expected_code = 200;
+    if (sscanf(check_str, "%15s %255s %d", method, path, &expected_code) < 2)
+        return 0;
+
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd < 0) return 0;
+
+    struct timeval tv = { .tv_sec = 3, .tv_usec = 0 };
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+
+    struct sockaddr_in addr = {
+        .sin_family = AF_INET,
+        .sin_port   = htons((uint16_t)port),
+    };
+    if (inet_pton(AF_INET, ip, &addr.sin_addr) <= 0) { close(fd); return 0; }
+    if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+        close(fd); return 0;
+    }
+
+    char req[512];
+    int rlen = snprintf(req, sizeof(req),
+        "%s %s HTTP/1.0\r\nHost: %s\r\nConnection: close\r\n\r\n",
+        method, path, ip);
+    if (write(fd, req, (size_t)rlen) != rlen) { close(fd); return 0; }
+
+    char resp[64] = {0};
+    int n = (int)read(fd, resp, sizeof(resp) - 1);
+    close(fd);
+    if (n <= 0) return 0;
+
+    int actual_code = 0;
+    sscanf(resp, "HTTP/%*s %d", &actual_code);
+    return actual_code == expected_code;
+}
 
 static void* rollout_thread(void* arg) {
     RolloutArg* ra = arg;
@@ -203,11 +254,13 @@ static void* rollout_thread(void* arg) {
 
         /* Rolling: for each old-gen replica, launch one new then kill the old */
         for (int r = 0; r < old_desired; r++) {
-            /* Launch one new-gen replica */
+            /* Launch one new-gen replica — capture node IP before unlock */
             pthread_mutex_lock(&g_nodes_mu);
             pthread_mutex_lock(&g_workloads_mu);
             NodeEntry* nd = node_least_loaded_for_port(sp->port);
+            char new_node_ip[INET_ADDRSTRLEN] = {0};
             if (nd) {
+                snprintf(new_node_ip, sizeof(new_node_ip), "%s", nd->ip);
                 launch_replica(wl, nd);
             } else {
                 fprintf(stderr, "[sched] rollout: no eligible node for "
@@ -216,8 +269,38 @@ static void* rollout_thread(void* arg) {
             pthread_mutex_unlock(&g_workloads_mu);
             pthread_mutex_unlock(&g_nodes_mu);
 
-            /* Wait for the new replica to settle */
-            sleep(ROLLOUT_WAIT_S);
+            /* Wait for the new replica to become ready.
+             * If a health check is declared, poll it with a configurable
+             * timeout derived from health.interval (e.g. "30s").
+             * Fall back to the fixed ROLLOUT_WAIT_S window otherwise. */
+            if (sp->health.check[0] && new_node_ip[0] && sp->port > 0) {
+                int settle_s = ROLLOUT_READY_TIMEOUT_S;
+                int parsed_s = 0;
+                sscanf(sp->health.interval, "%d", &parsed_s);
+                if (parsed_s > 0) settle_s = parsed_s;
+
+                printf("[sched] rollout: probing %s at %s:%d "
+                       "(timeout %ds)...\n",
+                       sp->name, new_node_ip, sp->port, settle_s);
+                time_t deadline = time(NULL) + settle_s;
+                int ready = 0;
+                while (time(NULL) < deadline) {
+                    if (remote_health_probe(new_node_ip, sp->port,
+                                            sp->health.check)) {
+                        ready = 1;
+                        printf("[sched] rollout: %s is ready\n", sp->name);
+                        break;
+                    }
+                    sleep(ROLLOUT_PROBE_INTERVAL_S);
+                }
+                if (!ready)
+                    fprintf(stderr,
+                            "[sched] rollout: %s readiness timeout "
+                            "after %ds — proceeding with rollover\n",
+                            sp->name, settle_s);
+            } else {
+                sleep(ROLLOUT_WAIT_S);
+            }
 
             /* Kill the oldest old-gen replica */
             pthread_mutex_lock(&g_nodes_mu);

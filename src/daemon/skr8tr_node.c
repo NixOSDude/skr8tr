@@ -349,6 +349,60 @@ static void free_env_array(char** env, int count) {
 }
 
 /* -------------------------------------------------------------------------
+ * cgroups v2 resource limits
+ *
+ * Creates /sys/fs/cgroup/skr8tr/<name>/ and:
+ *   - writes pid to cgroup.procs
+ *   - sets memory.max if ram_bytes > 0
+ *   - sets cpu.max if cpu_cores > 0 (quota = cpu_cores × 100000 / 100000)
+ *
+ * Fails gracefully — cgroups v2 unavailable (non-Linux, containers without
+ * the cgroup ns mounted) is not a fatal condition.
+ * ---------------------------------------------------------------------- */
+
+static void cgroup_apply(const char* name, pid_t pid,
+                          int64_t ram_bytes, int cpu_cores) {
+    /* Parent cgroup directory for all skr8tr workloads */
+    if (mkdir("/sys/fs/cgroup/skr8tr", 0755) < 0 && errno != EEXIST) return;
+
+    char dir[320];
+    snprintf(dir, sizeof(dir), "/sys/fs/cgroup/skr8tr/%.127s", name);
+    if (mkdir(dir, 0755) < 0 && errno != EEXIST) return;
+
+    /* Assign PID to cgroup */
+    char path[384];
+    snprintf(path, sizeof(path), "%s/cgroup.procs", dir);
+    FILE* f = fopen(path, "w");
+    if (!f) return;   /* cgroups v2 not mounted or no permission */
+    fprintf(f, "%d\n", (int)pid);
+    fclose(f);
+
+    /* Memory ceiling */
+    if (ram_bytes > 0) {
+        snprintf(path, sizeof(path), "%s/memory.max", dir);
+        f = fopen(path, "w");
+        if (f) {
+            fprintf(f, "%lld\n", (long long)ram_bytes);
+            fclose(f);
+            printf("[node] cgroup: %s memory.max = %lld MB\n",
+                   name, (long long)(ram_bytes / (1024 * 1024)));
+        }
+    }
+
+    /* CPU quota: each core gets 100 ms of CPU time per 100 ms period */
+    if (cpu_cores > 0) {
+        snprintf(path, sizeof(path), "%s/cpu.max", dir);
+        f = fopen(path, "w");
+        if (f) {
+            fprintf(f, "%d 100000\n", cpu_cores * 100000);
+            fclose(f);
+            printf("[node] cgroup: %s cpu.max = %d core(s)\n",
+                   name, cpu_cores);
+        }
+    }
+}
+
+/* -------------------------------------------------------------------------
  * VM launch — build hypervisor argv and exec
  * QEMU: qemu-system-x86_64 -kernel K -hda R -m M -smp N -nographic
  * Firecracker: firecracker --config-file <generated json>
@@ -619,6 +673,10 @@ static pid_t launch_proc(const SkrProc* lp, char* err, size_t err_len) {
     int proc_idx = (int)(slot - g_procs);
     int log_fd   = slot->log_pipe_r;
     pthread_mutex_unlock(&g_procs_mu);
+
+    /* Apply cgroups v2 resource limits when manifest declares constraints */
+    if (lp->ram_bytes > 0 || lp->cpu_cores > 0)
+        cgroup_apply(lp->name, pid, lp->ram_bytes, lp->cpu_cores);
 
     /* Start log reader thread */
     if (log_fd >= 0) {
