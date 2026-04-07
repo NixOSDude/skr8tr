@@ -1,0 +1,51 @@
+<div class="page">
+  <div class="container checkout-layout" style="padding-top:2rem;padding-bottom:3rem">
+    <div class="checkout-form">
+      <h1 style="margin-bottom:1.5rem">Checkout</h1>
+
+      @if (error) { <div class="badge badge-danger" style="padding:.6rem 1rem;margin-bottom:1rem">{{ error }}</div> }
+
+      <section class="card" style="padding:1.5rem;margin-bottom:1.25rem">
+        <h3 style="margin-bottom:1rem">Shipping Address</h3>
+        <div class="form-group"><label>Full Name</label><input [(ngModel)]="form.name" placeholder="Jane Smith" /></div>
+        <div class="form-group"><label>Email</label><input [(ngModel)]="form.email" type="email" placeholder="jane@example.com" /></div>
+        <div class="form-group"><label>Street Address</label><input [(ngModel)]="form.street" placeholder="123 Main St" /></div>
+        <div class="addr-row">
+          <div class="form-group"><label>City</label><input [(ngModel)]="form.city" placeholder="Austin" /></div>
+          <div class="form-group"><label>State</label><input [(ngModel)]="form.state" placeholder="TX" style="width:80px" /></div>
+          <div class="form-group"><label>ZIP</label><input [(ngModel)]="form.zip" placeholder="78701" style="width:100px" /></div>
+        </div>
+      </section>
+
+      <section class="card" style="padding:1.5rem;margin-bottom:1.25rem">
+        <h3 style="margin-bottom:1rem">Payment (Mock)</h3>
+        <div class="form-group"><label>Card Number</label><input placeholder="4242 4242 4242 4242" /></div>
+        <div class="addr-row">
+          <div class="form-group"><label>Expiry</label><input placeholder="12/28" /></div>
+          <div class="form-group"><label>CVV</label><input placeholder="123" style="width:80px" /></div>
+        </div>
+        <p class="text-muted" style="font-size:.82rem">This is a demo. No real payment is processed.</p>
+      </section>
+
+      <button class="btn btn-primary btn-lg w-full" (click)="placeOrder()" [disabled]="placing || !cart()?.items?.length" style="justify-content:center">
+        {{ placing ? 'Placing order...' : 'Place Order →' }}
+      </button>
+    </div>
+
+    <div class="order-summary card" style="padding:1.5rem;align-self:start">
+      <h3 style="margin-bottom:1rem">Your Order</h3>
+      @if (cart()) {
+        @for (item of cart()!.items; track item.product_id) {
+          <div class="summary-item">
+            <span style="font-size:.88rem">{{ item.name }} × {{ item.quantity }}</span>
+            <span class="price">\${{ (item.price * item.quantity).toFixed(2) }}</span>
+          </div>
+        }
+        <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0" />
+        <div class="summary-item"><span>Subtotal</span><strong>\${{ cart()!.subtotal.toFixed(2) }}</strong></div>
+        <div class="summary-item"><span>Shipping</span><strong>{{ cart()!.subtotal > 75 ? 'FREE' : '\$9.99' }}</strong></div>
+        <div class="summary-item" style="font-size:1.05rem"><strong>Total</strong><strong>\${{ (cart()!.subtotal + (cart()!.subtotal > 75 ? 0 : 9.99) + cart()!.subtotal * 0.0825).toFixed(2) }}</strong></div>
+      }
+    </div>
+  </div>
+</div>

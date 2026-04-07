@@ -1,0 +1,23 @@
+app order-svc
+  exec     /opt/sovereign-market/bin/order-svc
+  port     8005
+  replicas 2
+
+  env {
+    PORT 8005
+    RUST_LOG info
+  }
+
+  health {
+    check    GET /health 200
+    interval 10s
+    timeout  3s
+    retries  3
+  }
+
+  scale {
+    min       1
+    max       4
+    cpu-above 70
+    cpu-below 20
+  }

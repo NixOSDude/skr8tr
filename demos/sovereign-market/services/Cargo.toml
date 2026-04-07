@@ -1,0 +1,23 @@
+[workspace]
+members = [
+    "product-svc",
+    "inventory-svc",
+    "search-svc",
+    "cart-svc",
+    "order-svc",
+    "user-svc",
+    "review-svc",
+    "recommendation-svc",
+    "frontend-svc",
+]
+resolver = "2"
+
+[workspace.dependencies]
+axum = { version = "0.8", features = ["json"] }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
+tower-http = { version = "0.6", features = ["cors", "fs"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"

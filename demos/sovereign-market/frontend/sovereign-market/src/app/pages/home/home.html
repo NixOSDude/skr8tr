@@ -1,0 +1,105 @@
+<div class="page">
+  <!-- HERO -->
+  <section class="hero-banner">
+    <div class="container">
+      <h1>Your Sovereign Marketplace</h1>
+      <p>500+ products. 9 microservices. Orchestrated by skr8tr. Zero Docker. Zero Kubernetes.</p>
+      <div class="flex gap-1" style="flex-wrap:wrap">
+        <a routerLink="/catalog" class="btn btn-primary btn-lg">Shop All Products</a>
+        <a href="https://skr8tr.online" target="_blank" class="btn btn-secondary btn-lg" style="border-color:rgba(255,255,255,.5);color:#fff">How It Works ↗</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- CATEGORY PILLS -->
+  <section class="category-bar">
+    <div class="container">
+      <div class="category-scroll">
+        @for (cat of heroCategories; track cat.name) {
+          <a [routerLink]="['/catalog']" [queryParams]="{category: cat.name}" class="category-pill">
+            <span class="cat-icon">{{ cat.icon }}</span>
+            <span>{{ cat.name }}</span>
+          </a>
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- STATS BAR -->
+  <section class="stats-bar">
+    <div class="container stats-grid">
+      <div class="stat"><span class="stat-num">500+</span><span class="stat-label">Products</span></div>
+      <div class="stat"><span class="stat-num">9</span><span class="stat-label">Microservices</span></div>
+      <div class="stat"><span class="stat-num">3</span><span class="stat-label">QEMU Nodes</span></div>
+      <div class="stat"><span class="stat-num">0</span><span class="stat-label">Kubernetes pods</span></div>
+      <div class="stat"><span class="stat-num">5MB</span><span class="stat-label">Control Plane</span></div>
+    </div>
+  </section>
+
+  <!-- FEATURED PRODUCTS -->
+  <section class="section container">
+    <div class="section-header">
+      <h2>Featured Products</h2>
+      <a routerLink="/catalog" [queryParams]="{featured: true}" class="btn btn-ghost">View all →</a>
+    </div>
+    @if (loading) {
+      <div class="spinner"></div>
+    } @else {
+      <div class="product-grid">
+        @for (p of featured; track p.id) {
+          <app-product-card [product]="p" />
+        }
+      </div>
+    }
+  </section>
+
+  <!-- SHOP BY CATEGORY -->
+  <section class="section container">
+    <div class="section-header">
+      <h2>Shop by Category</h2>
+    </div>
+    <div class="cat-grid">
+      @for (cat of heroCategories; track cat.name) {
+        <a [routerLink]="['/catalog']" [queryParams]="{category: cat.name}" class="cat-card" [style.border-top-color]="cat.color">
+          <span class="cat-card-icon">{{ cat.icon }}</span>
+          <strong>{{ cat.name }}</strong>
+          <span class="text-muted" style="font-size:.82rem">
+            {{ categories | categoryCount:cat.name }} products
+          </span>
+        </a>
+      }
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS: INFRASTRUCTURE -->
+  <section class="infra-section">
+    <div class="container">
+      <h2 class="text-center mb-3">Powered by Sovereign Infrastructure</h2>
+      <p class="text-center text-muted mb-4" style="max-width:560px;margin-left:auto;margin-right:auto">
+        Every product page, cart action, and order runs across 3 QEMU VMs orchestrated by skr8tr — no Docker, no Kubernetes, no YAML.
+      </p>
+      <div class="infra-grid">
+        <div class="infra-card">
+          <div class="infra-icon">🏗️</div>
+          <h4>3 QEMU Nodes</h4>
+          <p>Conductor + 2 worker nodes on a 10.10.0.x bridge. skr8tr schedules workloads across the fleet automatically.</p>
+        </div>
+        <div class="infra-card">
+          <div class="infra-icon">🦀</div>
+          <h4>9 Rust Microservices</h4>
+          <p>product, inventory, search, cart, order, user, review, recommendation, frontend — each a separate Rust binary.</p>
+        </div>
+        <div class="infra-card">
+          <div class="infra-icon">🔐</div>
+          <h4>PQC-Signed Commands</h4>
+          <p>Every deploy command is ML-DSA-65 signed. No passwords. No bearer tokens. Post-quantum from day one.</p>
+        </div>
+        <div class="infra-card">
+          <div class="infra-icon">⚡</div>
+          <h4>1.2s Deploy Time</h4>
+          <p>Fork + exec. No image pull. No pod scheduling. From <code>skr8tr up</code> to serving traffic in under 2 seconds.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
