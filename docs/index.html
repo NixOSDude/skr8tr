@@ -770,11 +770,6 @@
       <p>No etcd, no Raft, no leader election. Every node is a sovereign peer. The Conductor schedules via UDP heartbeats. Add nodes by running the binary.</p>
     </div>
     <div class="feat-card">
-      <div class="feat-icon">&#x2696;&#xFE0F;</div>
-      <h3>Auto-Scaling</h3>
-      <p>CPU-triggered scale-up and scale-down with configurable thresholds. Min/max replica bounds. No metrics-server, no HPA objects.</p>
-    </div>
-    <div class="feat-card">
       <div class="feat-icon">&#x1F50D;</div>
       <h3>Service Discovery</h3>
       <p>Built-in Tower registry. Services register automatically on launch, deregister on kill. Round-robin across replicas. Query with <code>skr8tr lookup</code>.</p>
@@ -1102,8 +1097,8 @@ skr8tr audit-verify      <span class="comment"># walk full chain — returns OK 
       <p style="margin-top:0.6rem;font-size:0.78rem;color:var(--gold);font-family:var(--font-mono);">ENTERPRISE ONLY</p>
     </div>
     <div class="ef-card">
-      <h4>&#x1F4C8; Custom Metric Autoscale</h4>
-      <p>The open-source core scales on CPU. Enterprise adds memory utilisation, queue depth, and arbitrary Prometheus metric triggers — plus cron-based predictive scaling for known traffic patterns. AND/OR composite rules supported.</p>
+      <h4>&#x1F4C8; Auto-Scaling</h4>
+      <p>CPU, memory, queue depth, and arbitrary Prometheus metric triggers. Cron-based predictive scaling for known traffic patterns. AND/OR composite rules. Min/max replica bounds enforced at the Conductor. No metrics-server, no HPA objects.</p>
       <p style="margin-top:0.6rem;font-size:0.78rem;color:var(--gold);font-family:var(--font-mono);">ENTERPRISE ONLY</p>
     </div>
   </div>
