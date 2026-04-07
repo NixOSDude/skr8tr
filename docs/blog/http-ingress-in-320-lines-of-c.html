@@ -129,12 +129,19 @@
       Matching is an O(N) scan — fine for any realistic number of routes:
     </p>
 
-    <p>
-      Routes are stored in a flat array, sorted longest-prefix first at startup.
-      Matching is an O(N) scan using <code>strncmp</code> against each prefix —
-      first match wins, same semantics as nginx location blocks.
-      No match returns a 404 to the client.
-    </p>
+    <div class="code-block">
+      <div class="code-label">src/daemon/skr8tr_ingress.c — route_match</div>
+      <div class="code-body"><span class="kw">static</span> Route *route_match(<span class="kw">const char</span> *path) {
+    <span class="comment">/* Routes sorted longest-prefix first at startup.
+       First match wins — same semantics as nginx location blocks. */</span>
+    <span class="kw">for</span> (<span class="kw">int</span> i = 0; i &lt; g_route_count; i++) {
+        <span class="kw">if</span> (strncmp(path, g_routes[i].prefix,
+                    strlen(g_routes[i].prefix)) == 0)
+            <span class="kw">return</span> &amp;g_routes[i];
+    }
+    <span class="kw">return</span> NULL; <span class="comment">/* → 404 */</span>
+}</div>
+    </div>
 
     <h2>Backend Resolution</h2>
 
@@ -144,12 +151,21 @@
       load balancing for free:
     </p>
 
-    <p>
-      For each request, the ingress sends a <code>LOOKUP|&lt;service&gt;</code> UDP datagram to
-      the Tower and parses the <code>OK|LOOKUP|name|ip|port</code> response — sub-millisecond
-      on any local network. The Tower round-robins across replicas, so load balancing comes for
-      free. If the Tower returns an error or no replicas are registered, the ingress returns 503.
-    </p>
+    <div class="code-block">
+      <div class="code-label">src/daemon/skr8tr_ingress.c — tower_lookup</div>
+      <div class="code-body"><span class="kw">static int</span> tower_lookup(<span class="kw">const char</span> *service,
+                           <span class="kw">char</span> *ip_out, <span class="kw">int</span> *port_out) {
+    <span class="comment">/* One UDP send + recv — sub-millisecond on loopback */</span>
+    <span class="kw">char</span> msg[256], resp[512];
+    snprintf(msg, <span class="kw">sizeof</span>(msg), <span class="str">"LOOKUP|%s"</span>, service);
+    udp_send_recv(g_tower_host, TOWER_PORT, msg, resp, <span class="kw">sizeof</span>(resp));
+
+    <span class="comment">/* Response: "OK|LOOKUP|name|ip|port" */</span>
+    <span class="kw">if</span> (strncmp(resp, <span class="str">"OK|LOOKUP|"</span>, 10) != 0) <span class="kw">return</span> -1;
+    sscanf(resp, <span class="str">"OK|LOOKUP|%*[^|]|%[^|]|%d"</span>, ip_out, port_out);
+    <span class="kw">return</span> 0;
+}</div>
+    </div>
 
     <h2>Bidirectional Proxy</h2>
 
@@ -159,13 +175,31 @@
       client↔backend lifecycle:
     </p>
 
-    <p>
-      Once the backend is connected, bytes flow in both directions via a <code>select()</code>
-      loop with a 30-second idle timeout. A single 64 KB buffer shuttles data
-      client→backend and backend→client. One pthread per connection owns the full lifecycle —
-      no async I/O, no event loop, no shared state. When either side closes the connection
-      or the timeout fires, the proxy thread exits and both sockets are closed.
-    </p>
+    <div class="code-block">
+      <div class="code-label">src/daemon/skr8tr_ingress.c — proxy_forward</div>
+      <div class="code-body"><span class="kw">static void</span> proxy_forward(<span class="kw">int</span> client_fd, <span class="kw">int</span> backend_fd) {
+    <span class="kw">char</span> buf[65536];
+    <span class="kw">while</span> (1) {
+        fd_set fds; FD_ZERO(&amp;fds);
+        FD_SET(client_fd, &amp;fds); FD_SET(backend_fd, &amp;fds);
+        <span class="kw">struct</span> timeval tv = { FORWARD_TIMEOUT_S, 0 };
+
+        <span class="kw">int</span> ready = select(MAX(client_fd, backend_fd)+1, &amp;fds, NULL, NULL, &amp;tv);
+        <span class="kw">if</span> (ready &lt;= 0) <span class="kw">break</span>; <span class="comment">/* timeout or error */</span>
+
+        <span class="kw">if</span> (FD_ISSET(client_fd, &amp;fds)) {
+            <span class="kw">ssize_t</span> n = recv(client_fd, buf, <span class="kw">sizeof</span>(buf), 0);
+            <span class="kw">if</span> (n &lt;= 0) <span class="kw">break</span>;
+            send(backend_fd, buf, n, 0);
+        }
+        <span class="kw">if</span> (FD_ISSET(backend_fd, &amp;fds)) {
+            <span class="kw">ssize_t</span> n = recv(backend_fd, buf, <span class="kw">sizeof</span>(buf), 0);
+            <span class="kw">if</span> (n &lt;= 0) <span class="kw">break</span>;
+            send(client_fd, buf, n, 0);
+        }
+    }
+}</div>
+    </div>
 
     <h2>What We Verified</h2>
 
