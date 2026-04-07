@@ -39,7 +39,8 @@ all: $(BIN) \
      $(BIN)/skr8tr_reg \
      $(BIN)/skr8tr_serve \
      $(BIN)/skr8tr_ingress \
-     $(BIN)/skrtrkey
+     $(BIN)/skrtrkey \
+     $(BIN)/skr8tr
 ifdef ENTERPRISE
 all: $(BIN)/skr8tr_rbac $(BIN)/skr8tr_sso
 endif
@@ -74,6 +75,9 @@ $(BIN)/skr8tr_ingress: $(SRC)/daemon/skr8tr_ingress.c $(SRC)/core/fabric.c
 
 $(BIN)/skrtrkey: $(SRC)/tools/skrtrkey.c $(SRC)/core/skrauth.c
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+$(BIN)/skr8tr: $(SRC)/tools/skr8tr_cli.c $(SRC)/core/fabric.c $(SRC)/core/skrauth.c
+	$(CC) $(CFLAGS) -I./src/parser $^ -o $@ $(LDFLAGS)
 
 $(BIN)/skr8tr_rbac: $(SRC)/enterprise/skr8tr_rbac.c $(SRC)/core/fabric.c
 	$(CC) $(CFLAGS) -I./src/enterprise $^ -o $@ $(LDFLAGS) -lssl -lcrypto
