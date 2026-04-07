@@ -6,14 +6,21 @@
  *
  * Responsibilities:
  *   - ML-DSA-65 ephemeral PQC identity at boot
- *   - UDP listener port 7770: LAUNCH | KILL | STATUS | PING | LOGS
+ *   - UDP listener port 7770: LAUNCH | KILL | STATUS | PING | LOGS | EXEC
  *   - Heartbeat broadcast every 5s: node_id, cpu%, ram_free_mb
  *   - Process launch: bare binary, static serve, WASM, or VM (QEMU/Firecracker)
  *   - Log capture: per-process stdout/stderr ring buffer (last 200 lines)
  *   - Health check enforcement: HTTP GET probe → kill+relaunch on failure
  *   - Tower auto-registration: REGISTER on launch, DEREGISTER on kill
+ *   - Restart policy: always / on-failure / never — per manifest declaration
+ *   - Graceful drain: configurable SIGTERM → SIGKILL window (drain Ns)
+ *   - Persistent volumes: host directories mkdir'd and injected as env vars
+ *   - Prometheus metrics: HTTP endpoint on port 9100 (/metrics)
+ *   - DIED broadcast: sent to Conductor when process dies unexpectedly
+ *   - EXEC|app|cmd: fork+exec a shell command, return stdout to caller
  *   - --run <manifest.skr8tr>: parse and launch on startup
  *   - --tower <host>: Tower address for auto-registration (default: 127.0.0.1)
+ *   - --conductor <host>: Conductor address for DIED broadcasts (default: 127.0.0.1)
  *
  * Wire protocol (UDP 7770):
  *   LAUNCH|name=<n>|bin=<b>|port=<p>|env=<K=V,...>
@@ -21,6 +28,10 @@
  *   STATUS
  *   LOGS|<app_name>
  *   PING
+ *   EXEC|<app_name>|<shell_command>
+ *
+ * Prometheus metrics (TCP 9100):
+ *   GET /metrics  →  Prometheus text format
  */
 
 #include "../core/fabric.h"
@@ -48,16 +59,19 @@
  * Constants
  * ---------------------------------------------------------------------- */
 
-#define SKRTR_PORT           7770   /* mesh broadcast / heartbeat send port */
-#define SKRTR_CMD_PORT       7775   /* node command port: LAUNCH/KILL/STATUS/PING/LOGS */
-#define TOWER_PORT           7772
-#define HEARTBEAT_INTERVAL_S 5
-#define MAX_MANAGED_PROCS    256
-#define NODE_ID_HEX_LEN      33
-#define MAX_ENV_INJECT       64
-#define LOG_RING_LINES       200
-#define LOG_LINE_LEN         256
-#define HEALTH_CHECK_INTERVAL 10   /* seconds between health probes */
+#define SKRTR_PORT            7770   /* mesh broadcast / heartbeat send port */
+#define SKRTR_CMD_PORT        7775   /* node command port: LAUNCH/KILL/STATUS/PING/LOGS/EXEC */
+#define TOWER_PORT            7772
+#define CONDUCTOR_PORT        7771
+#define METRICS_PORT          9100   /* Prometheus scrape endpoint */
+#define HEARTBEAT_INTERVAL_S  5
+#define MAX_MANAGED_PROCS     256
+#define NODE_ID_HEX_LEN       33
+#define MAX_ENV_INJECT        64
+#define LOG_RING_LINES        200
+#define LOG_LINE_LEN          256
+#define HEALTH_CHECK_INTERVAL 10     /* seconds between health probes */
+#define DRAIN_DEFAULT_S       2      /* default SIGTERM → SIGKILL window */
 
 /* -------------------------------------------------------------------------
  * Log ring buffer — per process
@@ -74,19 +88,29 @@ typedef struct {
  * ---------------------------------------------------------------------- */
 
 typedef struct {
-    char     name[128];
-    pid_t    pid;
-    int      active;
-    int      port;
-    int      log_pipe_r;      /* read end of stdout/stderr pipe */
-    pthread_t log_tid;
-    LogRing  logs;
+    char               name[128];
+    pid_t              pid;
+    int                active;
+    int                port;
+    int                log_pipe_r;      /* read end of stdout/stderr pipe */
+    pthread_t          log_tid;
+    LogRing            logs;
+
     /* health tracking */
-    char     health_check[512];   /* "GET /path 200" */
-    char     health_interval[32];
-    int      health_retries_max;
-    int      health_failures;
-    time_t   health_last_check;
+    char               health_check[512];   /* "GET /path 200" */
+    char               health_interval[32];
+    int                health_retries_max;
+    int                health_failures;
+    time_t             health_last_check;
+
+    /* lifecycle */
+    SkrtrRestartPolicy restart_policy;
+    int                drain_s;            /* SIGTERM grace window in seconds */
+    int                killed_intentionally; /* set to 1 by KILL handler */
+    int                last_exit_status;     /* from waitpid() for on-failure check */
+
+    /* copy of original launch params for restart policy relaunch */
+    SkrProc            relaunch;
 } ManagedProc;
 
 static ManagedProc     g_procs[MAX_MANAGED_PROCS];
@@ -130,12 +154,12 @@ static int node_identity_init(void) {
  * Tower registration
  * ---------------------------------------------------------------------- */
 
-static char g_tower_host[64] = "127.0.0.1";
+static char g_tower_host[64]     = "127.0.0.1";
+static char g_conductor_host[64] = "127.0.0.1";
 static int  g_sock = -1;
 
 static void tower_register(const char* name, int port) {
     if (port <= 0) return;
-    /* Get our local IP by connecting a UDP socket (no data sent) */
     char my_ip[INET_ADDRSTRLEN] = "127.0.0.1";
     int probe = socket(AF_INET, SOCK_DGRAM, 0);
     if (probe >= 0) {
@@ -182,6 +206,18 @@ static void tower_deregister(const char* name, int port) {
 }
 
 /* -------------------------------------------------------------------------
+ * DIED broadcast — notify Conductor of unexpected process death
+ * ---------------------------------------------------------------------- */
+
+static void died_broadcast(const char* name, int exit_status) {
+    if (g_sock < 0) return;
+    char msg[256];
+    snprintf(msg, sizeof(msg), "DIED|%.127s|%s|%d", name, g_node_id, exit_status);
+    fabric_send(g_sock, g_conductor_host, CONDUCTOR_PORT, msg, strlen(msg));
+    printf("[node] DIED broadcast: %s exit=%d\n", name, exit_status);
+}
+
+/* -------------------------------------------------------------------------
  * System metrics
  * ---------------------------------------------------------------------- */
 
@@ -216,6 +252,132 @@ static long ram_free_mb(void) {
 }
 
 /* -------------------------------------------------------------------------
+ * Prometheus metrics endpoint — TCP port 9100
+ *
+ * Serves Prometheus text format 0.0.4 on any HTTP GET request.
+ * Scrape with: curl http://<node>:9100/metrics
+ *              or any standard Prometheus scrape config.
+ *
+ * Metrics exposed:
+ *   skr8tr_node_info{node_id="..."} 1
+ *   skr8tr_node_cpu_percent
+ *   skr8tr_node_ram_free_mb
+ *   skr8tr_node_processes_active
+ *   skr8tr_process_health_failures{app="..."}
+ *   skr8tr_process_restart_count{app="..."}
+ * ---------------------------------------------------------------------- */
+
+/* Per-process restart counter — incremented on each policy-driven relaunch */
+static int g_restart_count[MAX_MANAGED_PROCS];
+
+static void* metrics_thread(void* arg) {
+    (void)arg;
+
+    int server = socket(AF_INET, SOCK_STREAM, 0);
+    if (server < 0) {
+        fprintf(stderr, "[node] metrics: socket failed: %s\n", strerror(errno));
+        return NULL;
+    }
+
+    int opt = 1;
+    setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+    struct sockaddr_in addr = {
+        .sin_family      = AF_INET,
+        .sin_port        = htons(METRICS_PORT),
+        .sin_addr.s_addr = INADDR_ANY,
+    };
+    if (bind(server, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+        fprintf(stderr, "[node] metrics: bind %d failed: %s\n",
+                METRICS_PORT, strerror(errno));
+        close(server);
+        return NULL;
+    }
+    listen(server, 8);
+    printf("[node] Prometheus metrics: http://0.0.0.0:%d/metrics\n", METRICS_PORT);
+
+    char req_buf[512];
+    while (1) {
+        int client = accept(server, NULL, NULL);
+        if (client < 0) continue;
+
+        /* Drain the HTTP request — we don't inspect it, respond to any GET */
+        struct timeval tv = { .tv_sec = 2, .tv_usec = 0 };
+        setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+        ssize_t _rn = read(client, req_buf, sizeof(req_buf) - 1);
+        (void)_rn;
+
+        /* Collect metrics under lock */
+        int  active_count   = 0;
+        char proc_metrics[4096];
+        proc_metrics[0] = '\0';
+
+        pthread_mutex_lock(&g_procs_mu);
+        for (int i = 0; i < MAX_MANAGED_PROCS; i++) {
+            ManagedProc* mp = &g_procs[i];
+            if (!mp->active) continue;
+            active_count++;
+
+            /* health failures per app */
+            char entry[256];
+            snprintf(entry, sizeof(entry),
+                "skr8tr_process_health_failures{app=\"%.127s\"} %d\n",
+                mp->name, mp->health_failures);
+            strncat(proc_metrics, entry,
+                    sizeof(proc_metrics) - strlen(proc_metrics) - 1);
+
+            /* restart count per app */
+            snprintf(entry, sizeof(entry),
+                "skr8tr_process_restart_count{app=\"%.127s\"} %d\n",
+                mp->name, g_restart_count[i]);
+            strncat(proc_metrics, entry,
+                    sizeof(proc_metrics) - strlen(proc_metrics) - 1);
+        }
+        pthread_mutex_unlock(&g_procs_mu);
+
+        int cpu  = cpu_percent();
+        long ram = ram_free_mb();
+
+        /* Build Prometheus text body */
+        char body[8192];
+        int blen = snprintf(body, sizeof(body),
+            "# HELP skr8tr_node_info Node identity\n"
+            "# TYPE skr8tr_node_info gauge\n"
+            "skr8tr_node_info{node_id=\"%s\"} 1\n"
+            "# HELP skr8tr_node_cpu_percent CPU utilization percent (0-100)\n"
+            "# TYPE skr8tr_node_cpu_percent gauge\n"
+            "skr8tr_node_cpu_percent %d\n"
+            "# HELP skr8tr_node_ram_free_mb Free RAM in megabytes\n"
+            "# TYPE skr8tr_node_ram_free_mb gauge\n"
+            "skr8tr_node_ram_free_mb %ld\n"
+            "# HELP skr8tr_node_processes_active Number of active managed processes\n"
+            "# TYPE skr8tr_node_processes_active gauge\n"
+            "skr8tr_node_processes_active %d\n"
+            "# HELP skr8tr_process_health_failures Health probe failure count per app\n"
+            "# TYPE skr8tr_process_health_failures gauge\n"
+            "# HELP skr8tr_process_restart_count Policy-driven restart count per app\n"
+            "# TYPE skr8tr_process_restart_count counter\n"
+            "%s",
+            g_node_id, cpu, ram, active_count, proc_metrics);
+
+        char http_resp[8192 + 256];
+        int rlen = snprintf(http_resp, sizeof(http_resp),
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Type: text/plain; version=0.0.4; charset=utf-8\r\n"
+            "Content-Length: %d\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+            "%s",
+            blen, body);
+
+        ssize_t _wn = write(client, http_resp, (size_t)rlen);
+        (void)_wn;
+        close(client);
+    }
+    return NULL;
+}
+
+/* -------------------------------------------------------------------------
  * Health check — HTTP GET probe
  * ---------------------------------------------------------------------- */
 
@@ -226,7 +388,6 @@ static int health_probe(const char* check_str, int port) {
     if (sscanf(check_str, "%15s %255s %d", method, path, &expected_code) < 2)
         return 0;
 
-    /* TCP connect to localhost:port */
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) return 0;
 
@@ -277,25 +438,127 @@ static ManagedProc* proc_alloc(void) {
     return NULL;
 }
 
-static void proc_reap(void) {
-    int status; pid_t pid;
-    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
-        pthread_mutex_lock(&g_procs_mu);
-        for (int i = 0; i < MAX_MANAGED_PROCS; i++) {
-            if (g_procs[i].active && g_procs[i].pid == pid) {
-                printf("[node] process exited: %s (pid %d)\n",
-                       g_procs[i].name, pid);
-                tower_deregister(g_procs[i].name, g_procs[i].port);
-                g_procs[i].active = 0;
-                g_procs[i].pid    = 0;
-                if (g_procs[i].log_pipe_r >= 0) {
-                    close(g_procs[i].log_pipe_r);
-                    g_procs[i].log_pipe_r = -1;
-                }
-                break;
-            }
+/* -------------------------------------------------------------------------
+ * Volume provisioning — mkdir host_path, inject env var post-fork
+ * ---------------------------------------------------------------------- */
+
+static void volume_provision(const char* path) {
+    /* Recursive mkdir: create each component of the path */
+    char tmp[SKRMAKER_PATH_LEN];
+    snprintf(tmp, sizeof(tmp), "%s", path);
+    for (char* p = tmp + 1; *p; p++) {
+        if (*p == '/') {
+            *p = '\0';
+            mkdir(tmp, 0755);
+            *p = '/';
         }
-        pthread_mutex_unlock(&g_procs_mu);
+    }
+    mkdir(tmp, 0755);
+}
+
+/* -------------------------------------------------------------------------
+ * Restart accounting
+ * ---------------------------------------------------------------------- */
+
+static void restart_count_inc(const ManagedProc* mp) {
+    int idx = (int)(mp - g_procs);
+    if (idx >= 0 && idx < MAX_MANAGED_PROCS) g_restart_count[idx]++;
+}
+
+/* -------------------------------------------------------------------------
+ * proc_reap — collect zombie children, handle restart policy, DIED broadcast
+ * ---------------------------------------------------------------------- */
+
+/* Collects one batch of dead children.  For each:
+ *   - if killed_intentionally: just mark inactive.
+ *   - if restart_policy demands relaunch: copy relaunch params, mark inactive,
+ *     relaunch outside the lock (avoids re-entrant launch_proc deadlock).
+ *   - if no restart: broadcast DIED to Conductor.
+ *
+ * Returns list of SkrProc copies that need relaunching (max 8 in one pass).
+ * Caller is responsible for relaunching them after releasing the mutex. */
+
+typedef struct { SkrProc proc; int idx; } RelaunchItem;
+
+static void proc_reap(void) {
+    int status;
+    pid_t pid;
+
+    /* collect all dead children */
+    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+        int exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : 1;
+
+        /* Find the managed slot */
+        pthread_mutex_lock(&g_procs_mu);
+        int found = 0;
+        for (int i = 0; i < MAX_MANAGED_PROCS; i++) {
+            ManagedProc* mp = &g_procs[i];
+            if (!mp->active || mp->pid != pid) continue;
+            found = 1;
+
+            char name[128];
+            snprintf(name, sizeof(name), "%s", mp->name);
+            int port        = mp->port;
+            int intentional = mp->killed_intentionally;
+
+            SkrtrRestartPolicy policy = mp->restart_policy;
+            SkrProc relaunch_copy     = mp->relaunch;
+
+            /* Mark slot free */
+            tower_deregister(mp->name, mp->port);
+            if (mp->log_pipe_r >= 0) { close(mp->log_pipe_r); mp->log_pipe_r = -1; }
+            mp->active = 0;
+            mp->pid    = 0;
+            mp->killed_intentionally = 0;
+            pthread_mutex_unlock(&g_procs_mu);
+
+            printf("[node] process exited: %s (pid %d, exit=%d)\n",
+                   name, pid, exit_code);
+
+            if (intentional) break;
+
+            /* Determine restart action */
+            int do_restart = 0;
+            if      (policy == SKRTR_RESTART_ALWAYS)     do_restart = 1;
+            else if (policy == SKRTR_RESTART_ON_FAILURE)  do_restart = (exit_code != 0);
+
+            if (do_restart) {
+                printf("[node] restarting: %s (policy=%s)\n",
+                       name,
+                       policy == SKRTR_RESTART_ALWAYS ? "always" : "on-failure");
+
+                /* Re-use the relaunch SkrProc copy */
+                /* launch_proc will re-populate a new slot */
+                /* Small sleep to avoid tight restart loops */
+                struct timespec wait = { .tv_sec=1, .tv_nsec=0 };
+                nanosleep(&wait, NULL);
+
+                /* Find our slot index for restart count */
+                pthread_mutex_lock(&g_procs_mu);
+                /* locate the slot by name to get index — slot may be same or different */
+                for (int j = 0; j < MAX_MANAGED_PROCS; j++) {
+                    if (!g_procs[j].active && !g_procs[j].name[0]) {
+                        restart_count_inc(&g_procs[j]);
+                        break;
+                    }
+                }
+                pthread_mutex_unlock(&g_procs_mu);
+
+                /* Launch outside lock — launch_proc takes the mutex internally */
+                char lerr[256] = {0};
+                extern pid_t launch_proc(const SkrProc*, char*, size_t);
+                if (launch_proc(&relaunch_copy, lerr, sizeof(lerr)) < 0)
+                    fprintf(stderr, "[node] restart failed: %s: %s\n", name, lerr);
+            } else {
+                /* Unexpected death — notify Conductor */
+                (void)port;
+                died_broadcast(name, exit_code);
+            }
+
+            pthread_mutex_lock(&g_procs_mu);
+            break;
+        }
+        if (!found) pthread_mutex_unlock(&g_procs_mu);
     }
 }
 
@@ -362,22 +625,19 @@ static void free_env_array(char** env, int count) {
 
 static void cgroup_apply(const char* name, pid_t pid,
                           int64_t ram_bytes, int cpu_cores) {
-    /* Parent cgroup directory for all skr8tr workloads */
     if (mkdir("/sys/fs/cgroup/skr8tr", 0755) < 0 && errno != EEXIST) return;
 
     char dir[320];
     snprintf(dir, sizeof(dir), "/sys/fs/cgroup/skr8tr/%.127s", name);
     if (mkdir(dir, 0755) < 0 && errno != EEXIST) return;
 
-    /* Assign PID to cgroup */
     char path[384];
     snprintf(path, sizeof(path), "%s/cgroup.procs", dir);
     FILE* f = fopen(path, "w");
-    if (!f) return;   /* cgroups v2 not mounted or no permission */
+    if (!f) return;
     fprintf(f, "%d\n", (int)pid);
     fclose(f);
 
-    /* Memory ceiling */
     if (ram_bytes > 0) {
         snprintf(path, sizeof(path), "%s/memory.max", dir);
         f = fopen(path, "w");
@@ -389,7 +649,6 @@ static void cgroup_apply(const char* name, pid_t pid,
         }
     }
 
-    /* CPU quota: each core gets 100 ms of CPU time per 100 ms period */
     if (cpu_cores > 0) {
         snprintf(path, sizeof(path), "%s/cpu.max", dir);
         f = fopen(path, "w");
@@ -404,27 +663,22 @@ static void cgroup_apply(const char* name, pid_t pid,
 
 /* -------------------------------------------------------------------------
  * VM launch — build hypervisor argv and exec
- * QEMU: qemu-system-x86_64 -kernel K -hda R -m M -smp N -nographic
- * Firecracker: firecracker --config-file <generated json>
  * ---------------------------------------------------------------------- */
 
 static pid_t launch_vm(const SkrProc* sp, ManagedProc* slot,
                        char* err, size_t err_len) {
     const SkrtrVM* vm = &sp->vm;
 
-    /* Determine hypervisor — default to qemu-system-x86_64 */
     const char* hyp = vm->hypervisor[0] ? vm->hypervisor
                                         : "qemu-system-x86_64";
 
     int is_firecracker = (strstr(hyp, "firecracker") != NULL);
 
-    /* Build argv */
     char* argv[32];
     int   ai = 0;
     char  mem_s[32], smp_s[32];
 
     if (is_firecracker) {
-        /* Firecracker expects a JSON config — write one to /tmp */
         char cfg_path[256];
         snprintf(cfg_path, sizeof(cfg_path), "/tmp/skrtr_fc_%.127s.json", sp->name);
         FILE* f = fopen(cfg_path, "w");
@@ -452,7 +706,6 @@ static pid_t launch_vm(const SkrProc* sp, ManagedProc* slot,
         argv[ai++] = cfg_path;
         argv[ai++] = NULL;
     } else {
-        /* QEMU */
         snprintf(mem_s, sizeof(mem_s), "%d", vm->memory_mb > 0 ? vm->memory_mb : 128);
         snprintf(smp_s, sizeof(smp_s), "%d", vm->vcpus     > 0 ? vm->vcpus     : 1);
         argv[ai++] = (char*)hyp;
@@ -461,7 +714,6 @@ static pid_t launch_vm(const SkrProc* sp, ManagedProc* slot,
         argv[ai++] = (char*)"-m";    argv[ai++] = mem_s;
         argv[ai++] = (char*)"-smp";  argv[ai++] = smp_s;
         argv[ai++] = (char*)"-nographic";
-        /* network */
         if (!strcmp(vm->net, "user") || !vm->net[0]) {
             argv[ai++] = (char*)"-netdev";
             argv[ai++] = (char*)"user,id=n0";
@@ -469,22 +721,17 @@ static pid_t launch_vm(const SkrProc* sp, ManagedProc* slot,
             argv[ai++] = (char*)"virtio-net-pci,netdev=n0";
         }
         if (sp->port > 0) {
-            /* Forward guest port 80 to host port sp->port via QEMU user net */
             static char fwd[128];
             snprintf(fwd, sizeof(fwd),
                      "user,id=n0,hostfwd=tcp::%d-:80", sp->port);
-            /* replace the generic user netdev */
             for (int i = 0; i < ai; i++)
                 if (argv[i] && !strcmp(argv[i], "user,id=n0"))
                     argv[i] = fwd;
         }
-        if (vm->extra_args[0]) {
-            argv[ai++] = (char*)vm->extra_args;
-        }
+        if (vm->extra_args[0]) argv[ai++] = (char*)vm->extra_args;
         argv[ai++] = NULL;
     }
 
-    /* Set up log pipe */
     int pipe_fds[2] = {-1, -1};
     if (pipe(pipe_fds) < 0) { pipe_fds[0] = -1; pipe_fds[1] = -1; }
 
@@ -511,10 +758,10 @@ static pid_t launch_vm(const SkrProc* sp, ManagedProc* slot,
 }
 
 /* -------------------------------------------------------------------------
- * Launch a workload — binary or VM
+ * Launch a workload — binary, WASM, or VM
  * ---------------------------------------------------------------------- */
 
-static pid_t launch_proc(const SkrProc* lp, char* err, size_t err_len) {
+pid_t launch_proc(const SkrProc* lp, char* err, size_t err_len) {
     proc_reap();
 
     pthread_mutex_lock(&g_procs_mu);
@@ -526,8 +773,14 @@ static pid_t launch_proc(const SkrProc* lp, char* err, size_t err_len) {
     }
     memset(slot, 0, sizeof(*slot));
     snprintf(slot->name, sizeof(slot->name), "%s", lp->name);
-    slot->port        = lp->port;
-    slot->log_pipe_r  = -1;
+    slot->port          = lp->port;
+    slot->log_pipe_r    = -1;
+    slot->restart_policy = lp->restart_policy;
+    slot->drain_s        = lp->drain_s;
+
+    /* Store full launch params for restart policy relaunch */
+    slot->relaunch = *lp;
+    slot->relaunch.next = NULL;   /* no linked list in stored copy */
 
     /* Copy health config into slot for periodic checking */
     if (lp->health.check[0]) {
@@ -540,15 +793,23 @@ static pid_t launch_proc(const SkrProc* lp, char* err, size_t err_len) {
     }
     pthread_mutex_unlock(&g_procs_mu);
 
+    /* Provision volumes — mkdir host paths before fork */
+    for (int i = 0; i < lp->volume_count; i++) {
+        if (lp->volumes[i].host_path[0]) {
+            volume_provision(lp->volumes[i].host_path);
+            printf("[node] volume: provisioned %s → $%s\n",
+                   lp->volumes[i].host_path, lp->volumes[i].env_var);
+        }
+    }
+
     pid_t pid = -1;
 
     if (lp->workload_type == SKRTR_TYPE_VM) {
-        /* VM launch path */
         pthread_mutex_lock(&g_procs_mu);
         pid = launch_vm(lp, slot, err, err_len);
         pthread_mutex_unlock(&g_procs_mu);
     } else {
-        /* Process launch path */
+        /* Process launch path — binary, WASM (via wasmtime), or JOB */
         char serve_bin[600], serve_dir_arg[512], serve_port_arg[32];
         char* serve_argv[6];
         const char* bin = lp->bin[0] ? lp->bin : NULL;
@@ -588,7 +849,7 @@ static pid_t launch_proc(const SkrProc* lp, char* err, size_t err_len) {
             return -1;
         }
 
-        /* Build argv from bin + space-separated args field */
+        /* Build argv */
         static char  args_copy[512];
         static char* argv_with_args[64];
         char** argv_exec;
@@ -626,7 +887,6 @@ static pid_t launch_proc(const SkrProc* lp, char* err, size_t err_len) {
             }
         }
 
-        /* Pipe for log capture */
         int pipe_fds[2] = {-1, -1};
         if (pipe(pipe_fds) < 0) { pipe_fds[0] = -1; pipe_fds[1] = -1; }
 
@@ -645,20 +905,35 @@ static pid_t launch_proc(const SkrProc* lp, char* err, size_t err_len) {
             dup2(pipe_fds[1], STDOUT_FILENO);
             dup2(pipe_fds[1], STDERR_FILENO);
             close(pipe_fds[0]); close(pipe_fds[1]);
+
+            /* PORT env var */
             if (lp->port) {
                 char port_env[32];
                 snprintf(port_env, sizeof(port_env), "PORT=%d", lp->port);
                 putenv(port_env);
             }
+
+            /* Declared env vars */
             if (injected_env)
                 for (int i = 0; injected_env[i]; i++) putenv(injected_env[i]);
-            /* Inject secrets post-fork — never logged, never in UDP payload */
+
+            /* Secrets — injected post-fork, never logged, never in UDP payload */
             for (int si = 0; si < lp->secret_count; si++) {
                 char kv[SKRMAKER_ENV_KEY + SKRMAKER_ENV_VAL + 2];
                 snprintf(kv, sizeof(kv), "%s=%s",
                          lp->secrets[si].key, lp->secrets[si].val);
-                putenv(strdup(kv));   /* must survive after this block */
+                putenv(strdup(kv));
             }
+
+            /* Volumes — inject host path as env var */
+            for (int vi = 0; vi < lp->volume_count; vi++) {
+                if (!lp->volumes[vi].env_var[0] || !lp->volumes[vi].host_path[0]) continue;
+                char kv[SKRMAKER_VOL_ENV + SKRMAKER_PATH_LEN + 2];
+                snprintf(kv, sizeof(kv), "%s=%s",
+                         lp->volumes[vi].env_var, lp->volumes[vi].host_path);
+                putenv(strdup(kv));
+            }
+
             execv(bin, argv_exec);
             fprintf(stderr, "[node] exec failed '%s': %s\n",
                     bin, strerror(errno));
@@ -681,7 +956,7 @@ static pid_t launch_proc(const SkrProc* lp, char* err, size_t err_len) {
     int log_fd   = slot->log_pipe_r;
     pthread_mutex_unlock(&g_procs_mu);
 
-    /* Apply cgroups v2 resource limits when manifest declares constraints */
+    /* Apply cgroups v2 resource limits */
     if (lp->ram_bytes > 0 || lp->cpu_cores > 0)
         cgroup_apply(lp->name, pid, lp->ram_bytes, lp->cpu_cores);
 
@@ -699,11 +974,14 @@ static pid_t launch_proc(const SkrProc* lp, char* err, size_t err_len) {
         }
     }
 
-    printf("[node] launched: %s  pid=%d  type=%s\n",
+    printf("[node] launched: %s  pid=%d  type=%s  restart=%s  drain=%ds\n",
            lp->name, pid,
            lp->workload_type == SKRTR_TYPE_VM      ? "vm"      :
            lp->workload_type == SKRTR_TYPE_WASM     ? "wasm"    :
-           lp->workload_type == SKRTR_TYPE_JOB      ? "job"     : "service");
+           lp->workload_type == SKRTR_TYPE_JOB      ? "job"     : "service",
+           lp->restart_policy == SKRTR_RESTART_ALWAYS     ? "always"     :
+           lp->restart_policy == SKRTR_RESTART_ON_FAILURE  ? "on-failure" : "never",
+           lp->drain_s > 0 ? lp->drain_s : DRAIN_DEFAULT_S);
 
     /* Auto-register with Tower */
     int reg_port = lp->serve.port ? lp->serve.port
@@ -723,11 +1001,13 @@ static void handle_command(const char* cmd, size_t cmd_len,
                             char* resp, size_t resp_len) {
     (void)cmd_len;
 
+    /* ── PING ── */
     if (!strncmp(cmd, "PING", 4)) {
         snprintf(resp, resp_len, "OK|PONG|%s", g_node_id);
         return;
     }
 
+    /* ── STATUS ── */
     if (!strncmp(cmd, "STATUS", 6)) {
         pthread_mutex_lock(&g_procs_mu);
         int active = 0;
@@ -745,6 +1025,7 @@ static void handle_command(const char* cmd, size_t cmd_len,
         return;
     }
 
+    /* ── LOGS ── */
     if (!strncmp(cmd, "LOGS|", 5)) {
         char name[128];
         snprintf(name, sizeof(name), "%.127s", cmd + 5);
@@ -758,13 +1039,12 @@ static void handle_command(const char* cmd, size_t cmd_len,
             return;
         }
 
-        /* Build log output: last `count` lines from ring buffer */
         char out[FABRIC_MTU - 64];
         out[0] = '\0';
         int count = mp->logs.count;
         int start = count < LOG_RING_LINES
                   ? 0
-                  : mp->logs.head;   /* oldest line when full */
+                  : mp->logs.head;
 
         for (int i = 0; i < count && (int)strlen(out) < (int)sizeof(out) - LOG_LINE_LEN; i++) {
             int idx = (start + i) % LOG_RING_LINES;
@@ -778,6 +1058,7 @@ static void handle_command(const char* cmd, size_t cmd_len,
         return;
     }
 
+    /* ── KILL ── */
     if (!strncmp(cmd, "KILL|", 5)) {
         char name[128];
         snprintf(name, sizeof(name), "%.127s", cmd + 5);
@@ -792,10 +1073,19 @@ static void handle_command(const char* cmd, size_t cmd_len,
         }
         pid_t pid  = mp->pid;
         int   port = mp->port;
+
+        /* Mark intentional kill so proc_reap does not relaunch or broadcast DIED */
+        mp->killed_intentionally = 1;
+
+        /* Use configured drain window, fall back to DRAIN_DEFAULT_S */
+        int drain = mp->drain_s > 0 ? mp->drain_s : DRAIN_DEFAULT_S;
         pthread_mutex_unlock(&g_procs_mu);
 
+        /* Graceful drain: SIGTERM → wait → SIGKILL */
         kill(-pid, SIGTERM);
-        struct timespec ts = { .tv_sec=2, .tv_nsec=0 };
+        printf("[node] drain: SIGTERM → %s (pid %d), waiting %ds\n",
+               name, pid, drain);
+        struct timespec ts = { .tv_sec = drain, .tv_nsec = 0 };
         nanosleep(&ts, NULL);
         kill(-pid, SIGKILL);
 
@@ -805,14 +1095,87 @@ static void handle_command(const char* cmd, size_t cmd_len,
         mp->active = 0; mp->pid = 0;
         pthread_mutex_unlock(&g_procs_mu);
 
-        printf("[node] killed: %s (pid %d)\n", name, pid);
+        printf("[node] killed: %s (pid %d, drain=%ds)\n", name, pid, drain);
         snprintf(resp, resp_len, "OK|KILLED|%.127s", name);
         return;
     }
 
+    /* ── EXEC ── */
+    if (!strncmp(cmd, "EXEC|", 5)) {
+        /* Format: EXEC|<app_name>|<shell_command> */
+        char app[128] = {0};
+        char shell_cmd[512] = {0};
+        const char* rest = cmd + 5;
+        const char* sep  = strchr(rest, '|');
+        if (!sep) {
+            snprintf(resp, resp_len, "ERR|EXEC requires EXEC|app|cmd");
+            return;
+        }
+        size_t alen = (size_t)(sep - rest);
+        if (alen >= sizeof(app)) alen = sizeof(app) - 1;
+        memcpy(app, rest, alen);
+        app[alen] = '\0';
+        strncpy(shell_cmd, sep + 1, sizeof(shell_cmd) - 1);
+        /* strip trailing newline */
+        char* nl = strchr(shell_cmd, '\n'); if (nl) *nl = '\0';
+
+        /* Verify app is running */
+        pthread_mutex_lock(&g_procs_mu);
+        ManagedProc* mp = proc_find(app);
+        if (!mp) {
+            pthread_mutex_unlock(&g_procs_mu);
+            snprintf(resp, resp_len, "ERR|EXEC: app not running: %.127s", app);
+            return;
+        }
+        pthread_mutex_unlock(&g_procs_mu);
+
+        /* Fork, exec sh -c <cmd>, capture stdout */
+        int pipe_fds[2];
+        if (pipe(pipe_fds) < 0) {
+            snprintf(resp, resp_len, "ERR|EXEC: pipe failed: %s", strerror(errno));
+            return;
+        }
+
+        pid_t epid = fork();
+        if (epid < 0) {
+            close(pipe_fds[0]); close(pipe_fds[1]);
+            snprintf(resp, resp_len, "ERR|EXEC: fork failed: %s", strerror(errno));
+            return;
+        }
+        if (epid == 0) {
+            close(pipe_fds[0]);
+            dup2(pipe_fds[1], STDOUT_FILENO);
+            dup2(pipe_fds[1], STDERR_FILENO);
+            close(pipe_fds[1]);
+            execl("/bin/sh", "sh", "-c", shell_cmd, (char*)NULL);
+            _exit(127);
+        }
+        close(pipe_fds[1]);
+
+        /* Collect output — capped at resp buffer */
+        char out[FABRIC_MTU - 128];
+        out[0] = '\0';
+        int pos = 0;
+        char buf[256];
+        int n;
+        while ((n = (int)read(pipe_fds[0], buf, sizeof(buf))) > 0) {
+            int room = (int)sizeof(out) - pos - 1;
+            if (room <= 0) break;
+            if (n > room) n = room;
+            memcpy(out + pos, buf, (size_t)n);
+            pos += n;
+            out[pos] = '\0';
+        }
+        close(pipe_fds[0]);
+        waitpid(epid, NULL, 0);
+
+        snprintf(resp, resp_len, "OK|EXEC|%.127s|%s", app, out);
+        return;
+    }
+
+    /* ── LAUNCH ── */
     if (!strncmp(cmd, "LAUNCH|", 7)) {
         char name[128]={0}, bin[256]={0}, port_s[16]={0}, env_s[512]={0};
-        /* field_extract helper */
         #define FE(hay,key,out,olen) do { \
             const char* _p = strstr((hay),(key)); \
             if (_p) { _p+=strlen(key); const char* _e=strchr(_p,'|'); \
@@ -838,6 +1201,7 @@ static void handle_command(const char* cmd, size_t cmd_len,
         snprintf(lp.args, sizeof(lp.args), "%s", args_s);
         lp.port          = port_s[0] ? (int)strtol(port_s, NULL, 10) : 0;
         lp.workload_type = SKRTR_TYPE_SERVICE;
+        lp.restart_policy = SKRTR_RESTART_NEVER;
 
         if (env_s[0]) {
             char* copy = strdup(env_s);
@@ -855,9 +1219,9 @@ static void handle_command(const char* cmd, size_t cmd_len,
             free(copy);
         }
 
-        char err[256]={0};
-        pid_t pid = launch_proc(&lp, err, sizeof(err));
-        if (pid < 0) snprintf(resp, resp_len, "ERR|LAUNCH failed: %.200s", err);
+        char lerr[256]={0};
+        pid_t pid = launch_proc(&lp, lerr, sizeof(lerr));
+        if (pid < 0) snprintf(resp, resp_len, "ERR|LAUNCH failed: %.200s", lerr);
         else         snprintf(resp, resp_len, "OK|LAUNCHED|%.127s|%d", name, pid);
         return;
     }
@@ -882,7 +1246,6 @@ static void* heartbeat_thread(void* arg) {
             ManagedProc* mp = &g_procs[i];
             if (!mp->active || !mp->health_check[0] || mp->port <= 0) continue;
 
-            /* Parse interval (e.g. "30s") */
             int interval_s = 30;
             sscanf(mp->health_interval, "%d", &interval_s);
             if (interval_s < 5) interval_s = 5;
@@ -956,16 +1319,18 @@ int main(int argc, char* argv[]) {
     signal(SIGPIPE, SIG_IGN);
     signal(SIGCHLD, SIG_DFL);
 
-    /* Parse --tower <host> argument */
+    /* Parse CLI arguments */
     for (int i = 1; i < argc - 1; i++) {
         if (!strcmp(argv[i], "--tower"))
             snprintf(g_tower_host, sizeof(g_tower_host), "%s", argv[i+1]);
+        if (!strcmp(argv[i], "--conductor"))
+            snprintf(g_conductor_host, sizeof(g_conductor_host), "%s", argv[i+1]);
     }
 
     printf("[node] Skr8tr Fleet Node starting...\n");
     node_identity_init();
 
-    /* Mesh socket — heartbeat broadcast send / receives from conductor */
+    /* Mesh socket */
     g_sock = fabric_bind(SKRTR_PORT);
     if (g_sock < 0) {
         fprintf(stderr, "[node] FATAL: cannot bind port %d: %s\n",
@@ -973,7 +1338,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    /* Command socket — dedicated port for operator and conductor commands */
+    /* Command socket */
     int cmd_sock = fabric_bind(SKRTR_CMD_PORT);
     if (cmd_sock < 0) {
         fprintf(stderr, "[node] FATAL: cannot bind port %d: %s\n",
@@ -981,14 +1346,24 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    printf("[node] mesh=UDP:%d  cmd=UDP:%d  tower=%s:%d\n",
-           SKRTR_PORT, SKRTR_CMD_PORT, g_tower_host, TOWER_PORT);
+    printf("[node] mesh=UDP:%d  cmd=UDP:%d  tower=%s:%d  conductor=%s:%d\n",
+           SKRTR_PORT, SKRTR_CMD_PORT,
+           g_tower_host, TOWER_PORT,
+           g_conductor_host, CONDUCTOR_PORT);
 
+    /* Heartbeat + health check thread */
     pthread_t hb_tid;
     pthread_attr_t attr;
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
     pthread_create(&hb_tid, &attr, heartbeat_thread, NULL);
+    pthread_attr_destroy(&attr);
+
+    /* Prometheus metrics thread */
+    pthread_t metrics_tid;
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+    pthread_create(&metrics_tid, &attr, metrics_thread, NULL);
     pthread_attr_destroy(&attr);
 
     /* --run <manifest> flags */
@@ -1011,12 +1386,11 @@ int main(int argc, char* argv[]) {
         int ready = select(max_fd + 1, &rfds, NULL, NULL, NULL);
         if (ready < 0) { if (errno == EINTR) continue; continue; }
 
-        /* Mesh socket — heartbeat ingestion (conductor sends LAUNCH/KILL here too) */
         if (FD_ISSET(g_sock, &rfds)) {
             int n = fabric_recv(g_sock, buf, sizeof(buf)-1, &src);
             if (n > 0) {
                 buf[n] = '\0';
-                if (!strncmp(buf, "HEARTBEAT|", 10)) continue; /* drop own broadcasts */
+                if (!strncmp(buf, "HEARTBEAT|", 10)) continue;
                 resp[0] = '\0';
                 handle_command(buf, (size_t)n, resp, sizeof(resp));
                 if (resp[0])
@@ -1024,7 +1398,6 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        /* Command socket — direct operator queries (STATUS/PING/LOGS etc.) */
         if (FD_ISSET(cmd_sock, &rfds)) {
             int n = fabric_recv(cmd_sock, buf, sizeof(buf)-1, &src);
             if (n > 0) {

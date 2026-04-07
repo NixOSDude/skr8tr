@@ -546,7 +546,7 @@ static int launch_replica(Workload* wl, NodeEntry* node) {
     const char* restart_str =
         sp->restart_policy == SKRTR_RESTART_ON_FAILURE ? "on-failure" :
         sp->restart_policy == SKRTR_RESTART_NEVER      ? "never"      : "always";
-    int drain_s = sp->drain_timeout_s > 0 ? sp->drain_timeout_s : 5;
+    int drain_s = sp->drain_s > 0 ? sp->drain_s : 5;
 
     char cmd[FABRIC_MTU];
     /* Build base command with required fields */

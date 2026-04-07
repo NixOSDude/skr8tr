@@ -20,15 +20,17 @@
  * Constants
  * ---------------------------------------------------------------------- */
 
-#define SKRMAKER_NAME_LEN   128
-#define SKRMAKER_PATH_LEN   256
-#define SKRMAKER_CMD_LEN    512
-#define SKRMAKER_URL_LEN    256
-#define SKRMAKER_ENV_KEY    64
-#define SKRMAKER_ENV_VAL    256
+#define SKRMAKER_NAME_LEN    128
+#define SKRMAKER_PATH_LEN    256
+#define SKRMAKER_CMD_LEN     512
+#define SKRMAKER_URL_LEN     256
+#define SKRMAKER_ENV_KEY     64
+#define SKRMAKER_ENV_VAL     256
 #define SKRMAKER_MAX_RUNS    16
 #define SKRMAKER_MAX_ENV     64
 #define SKRMAKER_MAX_SECRETS 32
+#define SKRMAKER_MAX_VOLUMES 16
+#define SKRMAKER_VOL_ENV     64    /* env var name injected for the volume path */
 
 /* -------------------------------------------------------------------------
  * Workload type
@@ -40,6 +42,21 @@ typedef enum {
     SKRTR_TYPE_WASM,          /* WASM module via wasmtime */
     SKRTR_TYPE_VM,            /* full VM — QEMU or Firecracker microVM */
 } SkrtrWorkloadType;
+
+/* -------------------------------------------------------------------------
+ * Restart policy
+ *
+ * Declared in the manifest as:
+ *   restart always        → restart on any exit (zero or non-zero)
+ *   restart on-failure    → restart only on non-zero exit code
+ *   restart never         → do not restart (default)
+ * ---------------------------------------------------------------------- */
+
+typedef enum {
+    SKRTR_RESTART_NEVER      = 0,   /* default — do not restart on exit */
+    SKRTR_RESTART_ALWAYS     = 1,   /* restart on any exit condition */
+    SKRTR_RESTART_ON_FAILURE = 2,   /* restart only on non-zero exit code */
+} SkrtrRestartPolicy;
 
 /* -------------------------------------------------------------------------
  * Sub-structs
@@ -89,6 +106,23 @@ typedef struct {
     char val[SKRMAKER_ENV_VAL];
 } SkrtrSecret;
 
+/* Persistent volume — a host directory mounted into the process via env var.
+ *
+ * Manifest syntax:
+ *   volume {
+ *     path  /data/myapp          # host directory (created if missing)
+ *     env   DATA_DIR             # env var name injected post-fork
+ *   }
+ *
+ * The node ensures the directory exists (mkdir -p equivalent), then injects
+ *   DATA_DIR=/data/myapp
+ * into the child environment post-fork. No container mounts — the process
+ * accesses the path directly. Multiple volume blocks are supported. */
+typedef struct {
+    char host_path[SKRMAKER_PATH_LEN];   /* absolute path on the node host */
+    char env_var[SKRMAKER_VOL_ENV];      /* env var name injected into child */
+} SkrtrVolume;
+
 /* VM configuration — only populated when workload_type == SKRTR_TYPE_VM */
 typedef struct {
     char hypervisor[SKRMAKER_PATH_LEN]; /* path: qemu-system-x86_64 or firecracker */
@@ -122,12 +156,16 @@ typedef struct SkrProc {
     int64_t            ram_bytes;
     int                cpu_cores;
 
+    /* lifecycle */
+    SkrtrRestartPolicy restart_policy;    /* restart always/on-failure/never */
+    int                drain_s;           /* SIGTERM grace window in seconds (0 = 2s default) */
+
     /* sub-blocks */
     SkrtrBuild         build;
     SkrtrServe         serve;
     SkrtrHealth        health;
     SkrtrScale         scale;
-    SkrtrVM            vm;           /* populated for SKRTR_TYPE_VM */
+    SkrtrVM            vm;               /* populated for SKRTR_TYPE_VM */
 
     /* environment variables */
     SkrtrEnvVar        env[SKRMAKER_MAX_ENV];
@@ -136,6 +174,10 @@ typedef struct SkrProc {
     /* secret environment variables — injected post-fork, never logged */
     SkrtrSecret        secrets[SKRMAKER_MAX_SECRETS];
     int                secret_count;
+
+    /* persistent volumes — host directories injected as env vars post-fork */
+    SkrtrVolume        volumes[SKRMAKER_MAX_VOLUMES];
+    int                volume_count;
 
     /* linked list */
     struct SkrProc*    next;

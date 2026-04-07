@@ -142,6 +142,17 @@ static int parse_pct(const char* s) {
     return (int)strtol(s, NULL, 10);
 }
 
+/* Parse duration string like "30s", "5m" into seconds */
+static int parse_duration_s(const char* s) {
+    char* end;
+    int v = (int)strtol(s, &end, 10);
+    if (end == s) return 0;
+    char* u = ltrim(end);
+    if      (*u == 'm') return v * 60;
+    else if (*u == 'h') return v * 3600;
+    else                return v;   /* default: seconds */
+}
+
 /* -------------------------------------------------------------------------
  * Block parsers
  * ---------------------------------------------------------------------- */
@@ -275,6 +286,39 @@ static int parse_secret(Parser* p, SkrProc* proc, int parent_indent) {
     return 1;
 }
 
+/* parse_volume — one `volume {}` block per call.
+ *
+ * Syntax:
+ *   volume {
+ *     path  /data/myapp
+ *     env   DATA_DIR
+ *   }
+ *
+ * Multiple volume blocks per app are supported up to SKRMAKER_MAX_VOLUMES.
+ * The node creates the host directory if it does not exist, then injects
+ * the env var into the child process environment after fork. */
+static int parse_volume(Parser* p, SkrProc* proc, int parent_indent) {
+    if (proc->volume_count >= SKRMAKER_MAX_VOLUMES) return 1;  /* silently cap */
+
+    int idx = proc->volume_count++;
+    SkrtrVolume* vol = &proc->volumes[idx];
+
+    char* line;
+    while ((line = read_line(p))) {
+        char* s = ltrim(line);
+        if (*s == '}') return 1;
+        int ind = indent_of(line);
+        if (ind <= parent_indent) { push_back(p); return 1; }
+
+        char* key; char* val;
+        split_kv(line, &key, &val);
+
+        if      (!strcmp(key, "path")) strncpy(vol->host_path, val, sizeof(vol->host_path) - 1);
+        else if (!strcmp(key, "env"))  strncpy(vol->env_var,   val, sizeof(vol->env_var)   - 1);
+    }
+    return 1;
+}
+
 static int parse_vm(Parser* p, SkrProc* proc, int parent_indent) {
     char* line;
     while ((line = read_line(p))) {
@@ -325,19 +369,26 @@ static int parse_app(Parser* p, SkrProc* proc) {
         else if (!strcmp(key, "bin"))      strncpy(proc->bin,  val, sizeof(proc->bin)  - 1);
         else if (!strcmp(key, "exec"))     strncpy(proc->bin,  val, sizeof(proc->bin)  - 1);
         else if (!strcmp(key, "args"))     strncpy(proc->args, val, sizeof(proc->args) - 1);
+        else if (!strcmp(key, "drain"))    proc->drain_s = parse_duration_s(val);
+        else if (!strcmp(key, "restart")) {
+            if      (!strcmp(val, "always"))     proc->restart_policy = SKRTR_RESTART_ALWAYS;
+            else if (!strcmp(val, "on-failure")) proc->restart_policy = SKRTR_RESTART_ON_FAILURE;
+            else if (!strcmp(val, "never"))      proc->restart_policy = SKRTR_RESTART_NEVER;
+        }
         else if (!strcmp(key, "type")) {
             if      (!strcmp(val, "job"))     proc->workload_type = SKRTR_TYPE_JOB;
             else if (!strcmp(val, "service")) proc->workload_type = SKRTR_TYPE_SERVICE;
             else if (!strcmp(val, "wasm"))    proc->workload_type = SKRTR_TYPE_WASM;
             else if (!strcmp(val, "vm"))      proc->workload_type = SKRTR_TYPE_VM;
         }
-        else if (!strcmp(key, "build"))  parse_build(p, proc, app_indent);
-        else if (!strcmp(key, "serve"))  parse_serve(p, proc, app_indent);
-        else if (!strcmp(key, "health")) parse_health(p, proc, app_indent);
-        else if (!strcmp(key, "scale"))  parse_scale(p, proc, app_indent);
-        else if (!strcmp(key, "env"))    parse_env(p, proc, app_indent);
-        else if (!strcmp(key, "secret")) parse_secret(p, proc, app_indent);
-        else if (!strcmp(key, "vm"))     parse_vm(p, proc, app_indent);
+        else if (!strcmp(key, "build"))   parse_build(p, proc, app_indent);
+        else if (!strcmp(key, "serve"))   parse_serve(p, proc, app_indent);
+        else if (!strcmp(key, "health"))  parse_health(p, proc, app_indent);
+        else if (!strcmp(key, "scale"))   parse_scale(p, proc, app_indent);
+        else if (!strcmp(key, "env"))     parse_env(p, proc, app_indent);
+        else if (!strcmp(key, "secret"))  parse_secret(p, proc, app_indent);
+        else if (!strcmp(key, "volume"))  parse_volume(p, proc, app_indent);
+        else if (!strcmp(key, "vm"))      parse_vm(p, proc, app_indent);
         /* unknown keys silently accepted for forward compatibility */
     }
     return 1;
@@ -393,8 +444,9 @@ SkrProc* skrmaker_parse(const char* path, char* err, size_t err_len) {
             }
 
             strncpy(proc->name, val, sizeof(proc->name) - 1);
-            proc->workload_type = SKRTR_TYPE_SERVICE;
-            proc->replicas      = 1;
+            proc->workload_type  = SKRTR_TYPE_SERVICE;
+            proc->restart_policy = SKRTR_RESTART_NEVER;
+            proc->replicas       = 1;
 
             /* look ahead: consume `{` if present (brace syntax) */
             char* next = read_line(&p);
@@ -451,6 +503,12 @@ void skrmaker_dump(const SkrProc* proc) {
         if (p->cpu_cores) printf("  cpu       %d\n",   p->cpu_cores);
         if (p->bin[0])    printf("  bin       %s\n",   p->bin);
 
+        if (p->restart_policy != SKRTR_RESTART_NEVER)
+            printf("  restart   %s\n",
+                   p->restart_policy == SKRTR_RESTART_ALWAYS ? "always" : "on-failure");
+        if (p->drain_s)
+            printf("  drain     %ds\n", p->drain_s);
+
         if (p->build.run_count) {
             printf("  build\n");
             for (int i = 0; i < p->build.run_count; i++)
@@ -485,6 +543,12 @@ void skrmaker_dump(const SkrProc* proc) {
         for (int i = 0; i < p->env_count; i++) {
             if (i == 0) printf("  env\n");
             printf("    %s  %s\n", p->env[i].key, p->env[i].val);
+        }
+
+        for (int i = 0; i < p->volume_count; i++) {
+            printf("  volume\n");
+            printf("    path  %s\n", p->volumes[i].host_path);
+            printf("    env   %s\n", p->volumes[i].env_var);
         }
 
         if (p->workload_type == SKRTR_TYPE_VM && p->vm.kernel[0]) {
