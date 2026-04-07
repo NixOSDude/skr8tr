@@ -366,6 +366,7 @@ static int parse_app(Parser* p, SkrProc* proc) {
         else if (!strcmp(key, "replicas")) proc->replicas  = (int)strtol(val, NULL, 10);
         else if (!strcmp(key, "ram"))      proc->ram_bytes = parse_ram(val);
         else if (!strcmp(key, "cpu"))      proc->cpu_cores = (int)strtol(val, NULL, 10);
+        else if (!strcmp(key, "gpu"))      proc->gpu = (!strcmp(val,"true") || !strcmp(val,"1")||!strcmp(val,"yes")) ? 1 : 0;
         else if (!strcmp(key, "bin"))      strncpy(proc->bin,  val, sizeof(proc->bin)  - 1);
         else if (!strcmp(key, "exec"))     strncpy(proc->bin,  val, sizeof(proc->bin)  - 1);
         else if (!strcmp(key, "args"))     strncpy(proc->args, val, sizeof(proc->args) - 1);
@@ -501,6 +502,7 @@ void skrmaker_dump(const SkrProc* proc) {
         if (p->replicas)  printf("  replicas  %d\n",   p->replicas);
         if (p->ram_bytes) printf("  ram       %lld B\n", (long long)p->ram_bytes);
         if (p->cpu_cores) printf("  cpu       %d\n",   p->cpu_cores);
+        if (p->gpu)       printf("  gpu       true\n");
         if (p->bin[0])    printf("  bin       %s\n",   p->bin);
 
         if (p->restart_policy != SKRTR_RESTART_NEVER)

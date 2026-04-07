@@ -1106,4 +1106,112 @@ bin/skr8tr_sso --config /etc/skr8tr/sso.conf
 
 ---
 
+## 18. GPU Admin Node
+
+Skr8tr supports a **dedicated GPU compute node** in the mesh. Standard worker nodes require
+no GPU — only the designated GPU admin node needs CUDA-capable hardware.
+
+> **Hardware Note:** Skr8tr does not provide hardware. GPU node functionality requires
+> NVIDIA CUDA-capable hardware owned or rented by the operator. We can assist with
+> hardware selection and cloud/bare-metal provisioning — contact us.
+> Supported: AWS p3/p4, GCP A100, Azure NDv2, Hetzner AX102 (A100), on-prem RTX/A-series.
+
+### How it works
+
+```
+Skr8tr mesh:
+  Standard node A  (CPU only) ─────┐
+  Standard node B  (CPU only) ─────┤──► Conductor routes by workload type
+  Standard node C  (CPU only) ─────┘       │
+  GPU admin node   (RTX 3090 / A100) ──────┘
+        │
+        └── Only receives workloads declared with `gpu: true`
+```
+
+**HEARTBEAT extension:** GPU nodes append `GPU=1` to their heartbeat.
+Non-GPU nodes send the original 3-field format (fully backward-compatible).
+
+```
+Standard: HEARTBEAT|<node_id>|<cpu_pct>|<ram_mb>
+GPU node: HEARTBEAT|<node_id>|<cpu_pct>|<ram_mb>|GPU=1
+```
+
+**Conductor routing:** When a manifest declares `gpu: true`, the Conductor calls
+`node_least_loaded_for_gpu()` which filters to GPU-capable nodes only. If no GPU node
+is live, it logs a warning and falls back to any available node.
+
+**NODES response:** GPU nodes are tagged with `:GPU` in the node list:
+```
+skr8tr nodes
+[NODES]
+  <node_id>:<ip>:<cpu>:<ram>:GPU
+```
+
+### Starting a GPU admin node
+
+```bash
+# On the GPU machine (must have NVIDIA drivers + CUDA runtime installed)
+bin/skr8tr_node --gpu --conductor 192.168.68.50
+```
+
+### Manifest syntax
+
+```
+app gpu-trainer {
+  bin    /opt/models/train.sh
+  gpu    true            # ← route ONLY to GPU-capable node
+  replicas 1
+  ram    16G
+}
+```
+
+### Example topology
+
+```
+# 3 CPU worker nodes + 1 GPU admin node
+bin/skr8tr_node --conductor 192.168.68.50   # node A (CPU)
+bin/skr8tr_node --conductor 192.168.68.50   # node B (CPU)
+bin/skr8tr_node --conductor 192.168.68.50   # node C (CPU)
+bin/skr8tr_node --conductor 192.168.68.50 --gpu   # GPU node (CUDA required)
+
+# Submit a GPU workload — goes to the GPU node only
+skr8tr --key ~/.skr8tr/signing.sec up manifests/gpu-trainer.skr8tr
+```
+
+---
+
+## 19. Phase 4 — AI/RAG Admin Agent (Enterprise)
+
+All enterprise packages include the **Skr8tr AI Admin Agent** powered by RusticAgentic RAG.
+
+> This feature uses `skr8tr-agent` from [RusticAgentic](https://github.com/NixOSDude/rusticagentic)
+> — the same codebase, no modifications required.
+
+**Capabilities:**
+- **Natural language cluster control:** `skr8tr-agent cmd "scale trainer to 5 replicas"` → generates and optionally executes the exact `skr8tr` CLI command
+- **Autonomous healing watch:** `skr8tr-agent watch` monitors the mesh for anomalies (lost nodes, dropped replicas, high CPU, stuck replicas) and generates RAG-grounded recommendations from the actual Skr8tr source code
+- **Codebase Q&A:** `skr8tr-agent ask "how does the Conductor route GPU workloads?"` — answers from your specific version's code, not documentation
+- **Auto-fix mode:** `skr8tr-agent watch --auto-fix` — safe fixes applied automatically; destructive operations presented for admin approval
+
+**Setup:**
+```bash
+# One-time: ingest the Skr8tr codebase into the RAG index
+skr8tr-agent ingest --src /path/to/skr8tr
+
+# Watch the mesh and get AI recommendations on anomalies
+skr8tr-agent watch --conductor 192.168.68.50
+
+# Ask the cluster anything in plain English
+skr8tr-agent ask "why are my api replicas dropping?"
+
+# Natural language commands (generates + optionally executes)
+skr8tr-agent cmd "show all live nodes" --execute
+skr8tr-agent cmd "evict the broken service" --team admin --rkey ~/.skr8tr/admin.sec --execute
+```
+
+**Hardware note:** Embedding inference (gte-large-en-v1.5) runs via ONNX with CUDA acceleration
+when a GPU node is present. CPU-only inference works but is slower on large codebases.
+
+---
+
 *Skr8tr — The k8s Killer. Sovereign. Masterless. 20KB control plane.*

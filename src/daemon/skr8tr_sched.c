@@ -94,6 +94,7 @@ typedef struct {
     int      active;
     int      high_cpu_cycles;   /* consecutive cycles above cpu_above */
     int      low_cpu_cycles;    /* consecutive cycles below cpu_below */
+    int      gpu_capable;       /* 1 = node announced GPU=1 in HEARTBEAT */
     /* port collision tracking — prevents two apps binding the same port */
     int      used_ports[64];
     int      used_port_count;
@@ -143,6 +144,7 @@ static int g_state_loading = 0;  /* suppresses state_save during state_load repl
 static int        submit_workload(const char* manifest_path, char* resp, size_t resp_len);
 static NodeEntry* node_find(const char* node_id);
 static NodeEntry* node_least_loaded_for_port(int port);
+static NodeEntry* node_least_loaded_for_gpu(int port);
 static void       node_port_release(NodeEntry* n, int port);
 static int        launch_replica(Workload* wl, NodeEntry* node);
 
@@ -264,7 +266,9 @@ static void* rollout_thread(void* arg) {
             /* Launch one new-gen replica — capture node IP before unlock */
             pthread_mutex_lock(&g_nodes_mu);
             pthread_mutex_lock(&g_workloads_mu);
-            NodeEntry* nd = node_least_loaded_for_port(sp->port);
+            NodeEntry* nd = sp->gpu
+                ? node_least_loaded_for_gpu(sp->port)
+                : node_least_loaded_for_port(sp->port);
             char new_node_ip[INET_ADDRSTRLEN] = {0};
             if (nd) {
                 snprintf(new_node_ip, sizeof(new_node_ip), "%s", nd->ip);
@@ -492,6 +496,30 @@ static NodeEntry* node_least_loaded_for_port(int port) {
     return best;
 }
 
+/* GPU-capable variant — only considers nodes that announced GPU=1 in heartbeat.
+ * Falls back to ANY node if no GPU nodes are live (logs a warning). */
+static NodeEntry* node_least_loaded_for_gpu(int port) {
+    time_t     now  = time(NULL);
+    NodeEntry* best = NULL;
+    for (int i = 0; i < MAX_NODES; i++) {
+        NodeEntry* n = &g_nodes[i];
+        if (!n->active || (now - n->last_seen) >= NODE_EXPIRY_S) continue;
+        if (!n->gpu_capable) continue;   /* GPU workloads: GPU nodes only */
+        if (port > 0 && node_port_in_use(n, port)) continue;
+        if (!best ||
+            n->cpu_pct < best->cpu_pct ||
+            (n->cpu_pct == best->cpu_pct && n->ram_free_mb > best->ram_free_mb))
+            best = n;
+    }
+    if (!best) {
+        /* No GPU node available — warn and fall back to any node */
+        printf("[sched] WARNING: gpu workload requested but no GPU node is live — "
+               "falling back to any node\n");
+        best = node_least_loaded_for_port(port);
+    }
+    return best;
+}
+
 
 /* -------------------------------------------------------------------------
  * Placement helpers
@@ -692,7 +720,10 @@ static int submit_workload(const char* manifest_path,
         char first_node_id[33] = {0};
 
         for (int r = have; r < desired; r++) {
-            NodeEntry* node = node_least_loaded_for_port(sp->port);
+            /* Route to GPU-capable node if the manifest declares gpu: true */
+            NodeEntry* node = sp->gpu
+                ? node_least_loaded_for_gpu(sp->port)
+                : node_least_loaded_for_port(sp->port);
             if (!node) {
                 printf("[sched] WARNING: no eligible nodes for %s"
                        " (port %d may already be in use on all nodes)\n",
@@ -855,7 +886,9 @@ static void* rebalancer_thread(void* arg) {
                         /* Scale up */
                         if (nd->high_cpu_cycles >= SCALE_UP_CYCLES &&
                             have < scale_max) {
-                            NodeEntry* target = node_least_loaded_for_port(sp->port);
+                            NodeEntry* target = sp->gpu
+                                ? node_least_loaded_for_gpu(sp->port)
+                                : node_least_loaded_for_port(sp->port);
                             if (target && target != nd) {
                                 printf("[sched] scale-up: %s (cpu %d%% > %d%%)\n",
                                        sp->name, nd->cpu_pct, cpu_above);
@@ -886,7 +919,9 @@ static void* rebalancer_thread(void* arg) {
             /* Reconcile: relaunch any under-replicated workloads */
             have = placement_count(wl);
             while (have < desired) {
-                NodeEntry* node = node_least_loaded_for_port(sp->port);
+                NodeEntry* node = sp->gpu
+                    ? node_least_loaded_for_gpu(sp->port)
+                    : node_least_loaded_for_port(sp->port);
                 if (!node) break;
                 printf("[sched] reconcile: relaunching replica %d/%d of %s\n",
                        have + 1, desired, sp->name);
@@ -976,9 +1011,10 @@ static void handle_command(const char* cmd, const FabricAddr* src,
             if (!nd->active || (now - nd->last_seen) >= NODE_EXPIRY_S)
                 continue;
             live++;
-            char entry[96];
-            snprintf(entry, sizeof(entry), "%.32s:%.15s:%d:%ld",
-                     nd->node_id, nd->ip, nd->cpu_pct, nd->ram_free_mb);
+            char entry[112];
+            snprintf(entry, sizeof(entry), "%.32s:%.15s:%d:%ld%s",
+                     nd->node_id, nd->ip, nd->cpu_pct, nd->ram_free_mb,
+                     nd->gpu_capable ? ":GPU" : "");
             if (list[0]) strncat(list, ",", sizeof(list) - strlen(list) - 1);
             strncat(list, entry, sizeof(list) - strlen(list) - 1);
         }
@@ -1337,20 +1373,26 @@ static void handle_command(const char* cmd, const FabricAddr* src,
  * ---------------------------------------------------------------------- */
 
 static void process_heartbeat(const char* msg, const FabricAddr* src) {
-    /* HEARTBEAT|<node_id>|<cpu_pct>|<ram_free_mb> */
+    /* HEARTBEAT|<node_id>|<cpu_pct>|<ram_free_mb>[|GPU=1]
+     * The GPU field is optional — old nodes omit it (backward-compatible). */
     if (!strncmp(msg, "HEARTBEAT|", 10)) {
         char node_id[33] = {0};
         int  cpu_pct     = 0;
         long ram_mb      = 0;
-        if (sscanf(msg, "HEARTBEAT|%32[^|]|%d|%ld",
-                   node_id, &cpu_pct, &ram_mb) != 3)
-            return;
+        char gpu_field[16] = {0};
+        int  n_parsed = sscanf(msg, "HEARTBEAT|%32[^|]|%d|%ld|%15s",
+                               node_id, &cpu_pct, &ram_mb, gpu_field);
+        if (n_parsed < 3) return;
+        int gpu_capable = (n_parsed == 4 && !strcmp(gpu_field, "GPU=1")) ? 1 : 0;
+
         pthread_mutex_lock(&g_nodes_mu);
         NodeEntry* nd = node_upsert(node_id, src->ip);
         if (nd) {
             nd->cpu_pct     = cpu_pct;
             nd->ram_free_mb = ram_mb;
             nd->last_seen   = time(NULL);
+            /* Latch gpu_capable — once a node announces GPU it keeps it */
+            if (gpu_capable) nd->gpu_capable = 1;
         }
         pthread_mutex_unlock(&g_nodes_mu);
         return;

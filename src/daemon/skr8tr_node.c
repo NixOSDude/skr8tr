@@ -121,6 +121,7 @@ static pthread_mutex_t g_procs_mu = PTHREAD_MUTEX_INITIALIZER;
  * ---------------------------------------------------------------------- */
 
 static char g_node_id[NODE_ID_HEX_LEN];
+static int  g_gpu_node = 0;   /* 1 if this node was started with --gpu */
 
 static int node_identity_init(void) {
     OQS_SIG* sig = OQS_SIG_new(OQS_SIG_alg_ml_dsa_65);
@@ -1285,8 +1286,14 @@ next_hb:
         {
             int cpu = cpu_percent();
             long ram = ram_free_mb();
-            snprintf(msg, sizeof(msg), "HEARTBEAT|%s|%d|%ld",
-                     g_node_id, cpu, ram);
+            /* HEARTBEAT format: HEARTBEAT|node_id|cpu_pct|ram_mb[|GPU=1]
+             * GPU field is appended only on --gpu nodes (backward-compatible). */
+            if (g_gpu_node)
+                snprintf(msg, sizeof(msg), "HEARTBEAT|%s|%d|%ld|GPU=1",
+                         g_node_id, cpu, ram);
+            else
+                snprintf(msg, sizeof(msg), "HEARTBEAT|%s|%d|%ld",
+                         g_node_id, cpu, ram);
             fabric_broadcast(g_sock, SKRTR_PORT, msg, strlen(msg));
         }
         sleep(HEARTBEAT_INTERVAL_S);
@@ -1320,11 +1327,14 @@ int main(int argc, char* argv[]) {
     signal(SIGCHLD, SIG_DFL);
 
     /* Parse CLI arguments */
-    for (int i = 1; i < argc - 1; i++) {
-        if (!strcmp(argv[i], "--tower"))
-            snprintf(g_tower_host, sizeof(g_tower_host), "%s", argv[i+1]);
-        if (!strcmp(argv[i], "--conductor"))
-            snprintf(g_conductor_host, sizeof(g_conductor_host), "%s", argv[i+1]);
+    for (int i = 1; i < argc; i++) {
+        if (i + 1 < argc) {
+            if (!strcmp(argv[i], "--tower"))
+                snprintf(g_tower_host, sizeof(g_tower_host), "%s", argv[i+1]);
+            if (!strcmp(argv[i], "--conductor"))
+                snprintf(g_conductor_host, sizeof(g_conductor_host), "%s", argv[i+1]);
+        }
+        if (!strcmp(argv[i], "--gpu")) g_gpu_node = 1;
     }
 
     printf("[node] Skr8tr Fleet Node starting...\n");
@@ -1346,10 +1356,11 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    printf("[node] mesh=UDP:%d  cmd=UDP:%d  tower=%s:%d  conductor=%s:%d\n",
+    printf("[node] mesh=UDP:%d  cmd=UDP:%d  tower=%s:%d  conductor=%s:%d%s\n",
            SKRTR_PORT, SKRTR_CMD_PORT,
            g_tower_host, TOWER_PORT,
-           g_conductor_host, CONDUCTOR_PORT);
+           g_conductor_host, CONDUCTOR_PORT,
+           g_gpu_node ? "  [GPU-CAPABLE NODE]" : "");
 
     /* Heartbeat + health check thread */
     pthread_t hb_tid;

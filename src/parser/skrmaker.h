@@ -155,6 +155,7 @@ typedef struct SkrProc {
     int                replicas;
     int64_t            ram_bytes;
     int                cpu_cores;
+    int                gpu;           /* 1 = must run on a GPU-capable node (--gpu) */
 
     /* lifecycle */
     SkrtrRestartPolicy restart_policy;    /* restart always/on-failure/never */

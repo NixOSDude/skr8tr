@@ -589,3 +589,29 @@ make clean && make ENTERPRISE=1  # 9 enterprise binaries, zero warnings
   3. Auto-fix watch mode (anomaly → fix → apply)
   4. GPU admin node in mesh (--gpu flag, Conductor-aware routing)
 - RusticAgentic core crates are NOT modified — only the skr8tr-agent integration crate
+
+---
+
+## 2026-04-07 — Phase 4A: GPU Admin Node
+
+### GPU Routing in Mesh (skr8tr_sched.c + skr8tr_node.c)
+- `--gpu` flag on `skr8tr_node` sets `g_gpu_node = 1`
+- HEARTBEAT wire format extended: `HEARTBEAT|node_id|cpu_pct|ram_mb[|GPU=1]` (backward-compatible)
+- Conductor parses optional 4th field; latches `nd->gpu_capable` on NodeEntry
+- `node_least_loaded_for_gpu()` — selects least-loaded GPU-capable node, warns+falls-back if none live
+- All 4 routing call sites respect `sp->gpu`: submit_workload, rollout, rebalancer scale-up, reconcile
+
+### Manifest GPU Keyword (skrmaker.h + skrmaker.c)
+- `gpu: true` / `gpu: 1` / `gpu: yes` → `SkrProc.gpu = 1`
+- `skrmaker_dump()` prints `gpu       true` when set
+
+### OPERATIONS.md Sections 18+19
+- Section 18: GPU Admin Node — topology, HEARTBEAT format, manifest syntax, hardware note
+- Section 19: Phase 4 AI/RAG Admin Agent — enterprise all-packages, hardware requirements
+- Hardware note: "GPU admin node available only on CUDA/NVIDIA hardware — we don't provide hardware, contact us"
+
+### Build verification
+```
+make clean && make             # 7 OSS binaries, zero warnings
+make clean && make ENTERPRISE=1  # 9 enterprise binaries, zero warnings
+```
