@@ -7,6 +7,7 @@
   <meta property="og:title" content="Why We Killed Our Kubernetes Cluster" />
   <meta property="og:description" content="600MB of control plane to run three microservices. We replaced it with 5MB of C23. Here is what we measured." />
   <meta property="og:type" content="article" />
+  <link rel="icon" type="image/svg+xml" href="/skr8tr.svg" />
   <title>Why We Killed Our Kubernetes Cluster — Skr8tr Blog</title>
   <style>
     :root {
@@ -45,9 +46,11 @@
       height: 56px;
       display: flex; align-items: center; justify-content: space-between;
     }
-    .nav-brand img {
-      height: 30px;
+    .nav-brand {
+      display: block;
+      height: 28px;
       width: auto;
+      max-width: 140px;
     }
     .nav-links { display: flex; gap: 1.8rem; list-style: none; }
     .nav-links a { color: var(--muted); font-size: 0.88rem; transition: color 0.2s; }
