@@ -329,3 +329,56 @@ $ ps -p 968189 -o pid,ppid,comm,args
 ```
 
 Workloads tab now shows real PID. Replicas no longer stuck in "pending".
+
+---
+
+## [2026-04-06] main — Phase 12: ML-DSA-65 Sovereign Auth Layer
+
+### What Was Built
+Post-quantum command signing for the Skr8tr mesh. No passwords. No TLS. No bearer tokens.
+
+**Auth boundary:** Conductor port 7771. SUBMIT and EVICT require a valid ML-DSA-65
+signature. Read-only commands (NODES, LIST, PING) and the internal mesh are open.
+
+**Wire format:** `<cmd>|<unix_ts>|<6618-hex-ml-dsa65-sig>`
+**Replay protection:** ±30s nonce window (no server-side state required)
+**Dev mode:** if `skrtrview.pub` absent → unauthenticated with warning
+
+### Files Delivered
+| File | Role |
+|------|------|
+| `src/core/skrauth.h` | Auth API — sign/verify contract (SSoA L1) |
+| `src/core/skrauth.c` | ML-DSA-65 sign + verify implementation (SSoA L1) |
+| `src/tools/skrtrkey.c` | Operator tool: keygen / sign / verify (SSoA L3) |
+| `cli/build.rs` | liboqs dynamic link resolution for Rust CLI |
+| `src/core/fabric.h` | FABRIC_MTU 8192 → 16384 (fits signed commands) |
+| `src/daemon/skr8tr_sched.c` | Auth gate in handle_command + --pubkey flag |
+| `cli/src/main.rs` | --key flag; OQS FFI signing; sign_command() |
+
+### Operator Workflow
+```bash
+# One-time key generation:
+bin/skrtrkey keygen
+# → skrtrview.pub (1952 bytes, distribute to conductors)
+# → ~/.skr8tr/signing.sec (4032 bytes, chmod 600, stays on operator machine)
+
+# All future cluster operations:
+skr8tr --key ~/.skr8tr/signing.sec up app.skr8tr
+skr8tr --key ~/.skr8tr/signing.sec down my-app
+skr8tr nodes    # unsigned — always open
+skr8tr list     # unsigned — always open
+```
+
+### Verified
+- `skrtrkey keygen` → correct key sizes, chmod 600 on secret key
+- Unsigned SUBMIT → `ERR|UNAUTHORIZED — sign commands with: skr8tr --key ...`
+- Signed SUBMIT via CLI → `OK|SUBMITTED|my-server|...` (accepted and processed)
+- `skrtrkey verify skrtrview.pub <signed>` → VALID, bare command extracted
+
+### Why Better Than k8s
+k8s: kubeconfig bearer tokens (base64 of a secret string, effectively plaintext)
+Skr8tr: ML-DSA-65 post-quantum signatures — key never leaves operator machine,
+        no password on the wire, no TLS cert rotation, no YAML RBAC.
+
+### Next Milestone
+Phase 13: NixOS flake overlay for reproducible commercial builds
