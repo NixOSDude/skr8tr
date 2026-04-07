@@ -556,3 +556,36 @@ make ENTERPRISE=1 clean && make ENTERPRISE=1
 ### Enterprise Repo Synced
 - `gitea/skr8tr-enterprise` updated — all 6 modules now have full implementations
 - `gitea/skr8tr` private repo updated with all enterprise source
+
+---
+
+## 2026-04-07 — Phase 3: Unified Operator CLI + Enterprise Docs
+
+### bin/skr8tr — Unified Operator CLI
+- `src/tools/skr8tr_cli.c` — single binary for all Conductor and RBAC operations
+- **Workload**: up/down/rollout/exec/logs/lookup
+- **Cluster**: nodes/list/ping
+- **Enterprise namespace**: ns list/add/revoke, autoscale rules
+- **RBAC admin**: rbac team list/add/revoke — ML-DSA-65 signed with team key
+- Auto-detects `~/.skr8tr/signing.sec` for Conductor auth
+- `--team/--ns/--rkey` enables RBAC gateway mode on port 7773
+- Zero warnings, both OSS + ENTERPRISE builds
+
+### OPERATIONS.md sections 16+17
+- Section 16: CLI reference — all flags, commands, examples
+- Section 17: Enterprise config files — namespaces.conf, autoscale.conf, sso.conf, rbac.conf
+- Port map updated: 7773 RBAC, 7780 SSO, 9100 Prometheus
+
+### Build verification
+```
+make clean && make             # 7 OSS binaries, zero warnings
+make clean && make ENTERPRISE=1  # 9 enterprise binaries, zero warnings
+```
+
+### Phase 4 — Planned: RAG-Powered Agent
+- Scope: Use ~/RusticAgentic/crates/skr8tr-agent to add:
+  1. Enterprise codebase ingest (src/enterprise/ included)
+  2. NL → CLI command translation (`skr8tr-agent cmd "..."`)
+  3. Auto-fix watch mode (anomaly → fix → apply)
+  4. GPU admin node in mesh (--gpu flag, Conductor-aware routing)
+- RusticAgentic core crates are NOT modified — only the skr8tr-agent integration crate
