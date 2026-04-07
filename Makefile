@@ -42,8 +42,9 @@ $(BIN)/skr8tr_node: $(SRC)/daemon/skr8tr_node.c $(SRC)/core/fabric.c \
 	$(CC) $(CFLAGS) -I./src/parser $^ -o $@ $(LDFLAGS)
 
 $(BIN)/skr8tr_sched: $(SRC)/daemon/skr8tr_sched.c $(SRC)/core/fabric.c \
-                    $(SRC)/core/skrauth.c $(SRC)/parser/skrmaker.c
-	$(CC) $(CFLAGS) -I./src/parser $^ -o $@ $(LDFLAGS)
+                    $(SRC)/core/skrauth.c $(SRC)/core/skr8tr_audit.c \
+                    $(SRC)/parser/skrmaker.c
+	$(CC) $(CFLAGS) -I./src/parser $^ -o $@ $(LDFLAGS) -lssl -lcrypto
 
 $(BIN)/skr8tr_reg: $(SRC)/daemon/skr8tr_reg.c $(SRC)/core/fabric.c
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)

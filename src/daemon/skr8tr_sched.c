@@ -35,6 +35,7 @@
 
 #include "../core/fabric.h"
 #include "../core/skrauth.h"
+#include "../core/skr8tr_audit.h"
 #include "../parser/skrmaker.h"
 
 #include <arpa/inet.h>
@@ -537,19 +538,27 @@ static int launch_replica(Workload* wl, NodeEntry* node) {
         strncat(env_str, kv, sizeof(env_str) - strlen(env_str) - 1);
     }
 
+    /* Encode restart policy and drain timeout */
+    const char* restart_str =
+        sp->restart_policy == SKRTR_RESTART_ON_FAILURE ? "on-failure" :
+        sp->restart_policy == SKRTR_RESTART_NEVER      ? "never"      : "always";
+    int drain_s = sp->drain_timeout_s > 0 ? sp->drain_timeout_s : 5;
+
     char cmd[FABRIC_MTU];
-    if (env_str[0] && sp->args[0])
-        snprintf(cmd, sizeof(cmd), "LAUNCH|name=%s|bin=%s|port=%d|args=%s|env=%s",
-                 sp->name, sp->bin, sp->port, sp->args, env_str);
-    else if (sp->args[0])
-        snprintf(cmd, sizeof(cmd), "LAUNCH|name=%s|bin=%s|port=%d|args=%s",
-                 sp->name, sp->bin, sp->port, sp->args);
-    else if (env_str[0])
-        snprintf(cmd, sizeof(cmd), "LAUNCH|name=%s|bin=%s|port=%d|env=%s",
-                 sp->name, sp->bin, sp->port, env_str);
-    else
-        snprintf(cmd, sizeof(cmd), "LAUNCH|name=%s|bin=%s|port=%d",
-                 sp->name, sp->bin, sp->port);
+    /* Build base command with required fields */
+    int clen = snprintf(cmd, sizeof(cmd),
+                        "LAUNCH|name=%s|bin=%s|port=%d",
+                        sp->name, sp->bin, sp->port);
+    if (sp->args[0] && clen < (int)sizeof(cmd) - 1)
+        clen += snprintf(cmd + clen, sizeof(cmd) - (size_t)clen,
+                         "|args=%s", sp->args);
+    if (env_str[0] && clen < (int)sizeof(cmd) - 1)
+        clen += snprintf(cmd + clen, sizeof(cmd) - (size_t)clen,
+                         "|env=%s", env_str);
+    if (clen < (int)sizeof(cmd) - 1)
+        clen += snprintf(cmd + clen, sizeof(cmd) - (size_t)clen,
+                         "|restart=%s|drain=%d", restart_str, drain_s);
+    (void)clen;
 
     /* Use a dedicated ephemeral socket for the LAUNCH round-trip so we can
      * read the OK|LAUNCHED|name|pid reply without touching the main cmd_sock. */
@@ -880,6 +889,8 @@ static void handle_command(const char* cmd, const FabricAddr* src,
                         "[sched] UNAUTHORIZED command from %s — "
                         "sign with: skr8tr --key ~/.skr8tr/signing.sec\n",
                         src->ip);
+                skraudit_log(SKRAUDIT_AUTH_FAIL, "", src->ip,
+                             "bad or missing ML-DSA-65 signature");
                 snprintf(resp, resp_len,
                          "ERR|UNAUTHORIZED — sign commands with: "
                          "skr8tr --key ~/.skr8tr/signing.sec");
@@ -890,16 +901,22 @@ static void handle_command(const char* cmd, const FabricAddr* src,
     }
 
     if (!strncmp(effective_cmd, "SUBMIT|", 7)) {
+        skraudit_log(SKRAUDIT_SUBMIT, effective_cmd + 7, src->ip,
+                     "workload submitted");
         submit_workload(effective_cmd + 7, resp, resp_len);
         return;
     }
 
     if (!strncmp(effective_cmd, "EVICT|", 6)) {
+        skraudit_log(SKRAUDIT_EVICT, effective_cmd + 6, src->ip,
+                     "workload evicted");
         evict_workload(effective_cmd + 6, resp, resp_len);
         return;
     }
 
     if (!strncmp(effective_cmd, "ROLLOUT|", 8)) {
+        skraudit_log(SKRAUDIT_ROLLOUT, effective_cmd + 8, src->ip,
+                     "rolling update initiated");
         rollout_workload(effective_cmd + 8, resp, resp_len);
         return;
     }
@@ -950,6 +967,76 @@ static void handle_command(const char* cmd, const FabricAddr* src,
 
     if (!strcmp(effective_cmd, "PING")) {
         snprintf(resp, resp_len, "OK|PONG|conductor");
+        return;
+    }
+
+    /* ---------------------------------------------------------------
+     * EXEC|<app_name>|<shell_cmd>
+     * Forward to the first live node hosting the app and relay output.
+     * --------------------------------------------------------------- */
+    if (!strncmp(effective_cmd, "EXEC|", 5)) {
+        const char* rest = effective_cmd + 5;
+        const char* pipe_pos = strchr(rest, '|');
+        if (!pipe_pos) {
+            snprintf(resp, resp_len, "ERR|EXEC requires app|cmd");
+            return;
+        }
+        char app_name[128] = {0};
+        size_t alen = (size_t)(pipe_pos - rest);
+        if (alen >= sizeof(app_name)) alen = sizeof(app_name) - 1;
+        memcpy(app_name, rest, alen);
+        const char* shell_cmd = pipe_pos + 1;
+
+        /* Find a node hosting the app */
+        char target_ip[INET_ADDRSTRLEN] = {0};
+        pthread_mutex_lock(&g_workloads_mu);
+        pthread_mutex_lock(&g_nodes_mu);
+        for (int w = 0; w < MAX_WORKLOADS && !target_ip[0]; w++) {
+            Workload* wl = &g_workloads[w];
+            if (!wl->active || strcmp(wl->app_name, app_name)) continue;
+            for (int r = 0; r < MAX_REPLICAS; r++) {
+                Placement* pl = &wl->replicas[r];
+                if (!pl->active) continue;
+                NodeEntry* nd = node_find(pl->node_id);
+                if (nd) {
+                    snprintf(target_ip, sizeof(target_ip), "%s", nd->ip);
+                    break;
+                }
+            }
+        }
+        pthread_mutex_unlock(&g_nodes_mu);
+        pthread_mutex_unlock(&g_workloads_mu);
+
+        if (!target_ip[0]) {
+            snprintf(resp, resp_len, "ERR|no live node for app: %.127s",
+                     app_name);
+            return;
+        }
+
+        skraudit_log(SKRAUDIT_EXEC, app_name, src->ip, shell_cmd);
+
+        /* Forward EXEC to node CMD port and relay response */
+        int esock = fabric_bind(0);
+        if (esock < 0) {
+            snprintf(resp, resp_len, "ERR|socket: %s", strerror(errno));
+            return;
+        }
+        struct timeval tv = { .tv_sec = 15, .tv_usec = 0 };
+        setsockopt(esock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+        char fwd[FABRIC_MTU];
+        snprintf(fwd, sizeof(fwd), "EXEC|%.127s|%s", app_name, shell_cmd);
+        fabric_send(esock, target_ip, NODE_CMD_PORT, fwd, strlen(fwd));
+
+        char node_resp[FABRIC_MTU] = {0};
+        int rn = fabric_recv(esock, node_resp, sizeof(node_resp) - 1, NULL);
+        close(esock);
+        if (rn > 0) {
+            node_resp[rn] = '\0';
+            snprintf(resp, resp_len, "%s", node_resp);
+        } else {
+            snprintf(resp, resp_len, "ERR|EXEC timeout on node %s", target_ip);
+        }
         return;
     }
 
@@ -1039,6 +1126,37 @@ static void handle_command(const char* cmd, const FabricAddr* src,
         return;
     }
 
+    /* ---------------------------------------------------------------
+     * AUDIT|<n>
+     * Return the last n entries from the cryptographic audit ledger.
+     * HIPAA § 164.312(b) — Audit Controls query interface.
+     * HITRUST CSF 09.aa  — Audit Log review capability.
+     * --------------------------------------------------------------- */
+    if (!strncmp(effective_cmd, "AUDIT|", 6)) {
+        int n = atoi(effective_cmd + 6);
+        if (n <= 0 || n > 1000) n = 50;
+        char tail_buf[FABRIC_MTU - 64];
+        skraudit_tail(n, tail_buf, sizeof(tail_buf));
+        snprintf(resp, resp_len, "OK|AUDIT|%d|%s", n, tail_buf);
+        return;
+    }
+
+    /* ---------------------------------------------------------------
+     * AUDIT_VERIFY
+     * Walk the entire audit chain and verify every SHA-256 link.
+     * HITRUST CSF 09.ac — Log integrity verification.
+     * NIST 800-53 AU-9  — Protection of audit information.
+     * --------------------------------------------------------------- */
+    if (!strcmp(effective_cmd, "AUDIT_VERIFY")) {
+        char verify_err[512] = {0};
+        int rc = skraudit_verify_chain(verify_err, sizeof(verify_err));
+        if (rc == 0)
+            snprintf(resp, resp_len, "OK|AUDIT_VERIFY|%s", verify_err);
+        else
+            snprintf(resp, resp_len, "ERR|AUDIT_VERIFY|%s", verify_err);
+        return;
+    }
+
     snprintf(resp, resp_len, "ERR|unknown command");
     (void)src;
 }
@@ -1050,23 +1168,82 @@ static void handle_command(const char* cmd, const FabricAddr* src,
  * ---------------------------------------------------------------------- */
 
 static void process_heartbeat(const char* msg, const FabricAddr* src) {
-    /* Parse fields */
-    char node_id[33]  = {0};
-    int  cpu_pct      = 0;
-    long ram_free_mb  = 0;
-
-    if (sscanf(msg, "HEARTBEAT|%32[^|]|%d|%ld",
-               node_id, &cpu_pct, &ram_free_mb) != 3)
+    /* HEARTBEAT|<node_id>|<cpu_pct>|<ram_free_mb> */
+    if (!strncmp(msg, "HEARTBEAT|", 10)) {
+        char node_id[33] = {0};
+        int  cpu_pct     = 0;
+        long ram_mb      = 0;
+        if (sscanf(msg, "HEARTBEAT|%32[^|]|%d|%ld",
+                   node_id, &cpu_pct, &ram_mb) != 3)
+            return;
+        pthread_mutex_lock(&g_nodes_mu);
+        NodeEntry* nd = node_upsert(node_id, src->ip);
+        if (nd) {
+            nd->cpu_pct     = cpu_pct;
+            nd->ram_free_mb = ram_mb;
+            nd->last_seen   = time(NULL);
+        }
+        pthread_mutex_unlock(&g_nodes_mu);
         return;
-
-    pthread_mutex_lock(&g_nodes_mu);
-    NodeEntry* nd = node_upsert(node_id, src->ip);
-    if (nd) {
-        nd->cpu_pct     = cpu_pct;
-        nd->ram_free_mb = ram_free_mb;
-        nd->last_seen   = time(NULL);
     }
-    pthread_mutex_unlock(&g_nodes_mu);
+
+    /* DIED|<node_id>|<app_name>|<pid>|<exit_code>
+     * Mark the placement inactive so the rebalancer relaunches it. */
+    if (!strncmp(msg, "DIED|", 5)) {
+        char node_id[33] = {0}, app_name[128] = {0};
+        sscanf(msg, "DIED|%32[^|]|%127[^|]", node_id, app_name);
+        printf("[sched] DIED: %s on node %s\n", app_name, node_id);
+        skraudit_log(SKRAUDIT_NODE_DIED, app_name, node_id,
+                     "process exited — rebalancer will relaunch");
+
+        pthread_mutex_lock(&g_workloads_mu);
+        for (int w = 0; w < MAX_WORKLOADS; w++) {
+            Workload* wl = &g_workloads[w];
+            if (!wl->active || strcmp(wl->app_name, app_name)) continue;
+            for (int r = 0; r < MAX_REPLICAS; r++) {
+                Placement* pl = &wl->replicas[r];
+                if (!pl->active || strcmp(pl->node_id, node_id)) continue;
+
+                pthread_mutex_lock(&g_nodes_mu);
+                NodeEntry* nd = node_find(node_id);
+                if (nd && pl->port > 0)
+                    node_port_release(nd, pl->port);
+                pthread_mutex_unlock(&g_nodes_mu);
+
+                pl->active = 0;
+                wl->replica_count--;
+                break;
+            }
+        }
+        pthread_mutex_unlock(&g_workloads_mu);
+        return;
+    }
+
+    /* RELAUNCHED|<node_id>|<app_name>|<new_pid>
+     * Update the placement table with the new PID from a local node restart. */
+    if (!strncmp(msg, "RELAUNCHED|", 11)) {
+        char node_id[33] = {0}, app_name[128] = {0};
+        int  new_pid = 0;
+        sscanf(msg, "RELAUNCHED|%32[^|]|%127[^|]|%d",
+               node_id, app_name, &new_pid);
+        printf("[sched] RELAUNCHED: %s on node %s (new pid=%d)\n",
+               app_name, node_id, new_pid);
+
+        pthread_mutex_lock(&g_workloads_mu);
+        for (int w = 0; w < MAX_WORKLOADS; w++) {
+            Workload* wl = &g_workloads[w];
+            if (!wl->active || strcmp(wl->app_name, app_name)) continue;
+            for (int r = 0; r < MAX_REPLICAS; r++) {
+                Placement* pl = &wl->replicas[r];
+                if (pl->active && !strcmp(pl->node_id, node_id)) {
+                    pl->pid = new_pid;
+                    break;
+                }
+            }
+        }
+        pthread_mutex_unlock(&g_workloads_mu);
+        return;
+    }
 }
 
 /* -------------------------------------------------------------------------
@@ -1074,11 +1251,17 @@ static void process_heartbeat(const char* msg, const FabricAddr* src) {
  * ---------------------------------------------------------------------- */
 
 int main(int argc, char* argv[]) {
-    /* Parse --pubkey <path> */
+    /* Parse --pubkey <path> and --audit-log <path> */
+    const char* audit_path = NULL;
     for (int i = 1; i < argc - 1; i++) {
         if (!strcmp(argv[i], "--pubkey"))
             snprintf(g_pubkey_path, sizeof(g_pubkey_path), "%s", argv[i + 1]);
+        if (!strcmp(argv[i], "--audit-log"))
+            audit_path = argv[i + 1];
     }
+
+    /* Initialise cryptographic audit ledger */
+    skraudit_init(audit_path);   /* NULL → /var/log/skr8tr_audit.log */
 
     printf("[sched] Skr8tr Conductor starting...\n");
 
@@ -1162,13 +1345,12 @@ int main(int argc, char* argv[]) {
             continue;
         }
 
-        /* Heartbeat on mesh socket */
+        /* Mesh socket — heartbeats + DIED + RELAUNCHED from nodes */
         if (FD_ISSET(mesh_sock, &rfds)) {
             int n = fabric_recv(mesh_sock, buf, sizeof(buf) - 1, &src);
             if (n > 0) {
                 buf[n] = '\0';
-                if (!strncmp(buf, "HEARTBEAT|", 10))
-                    process_heartbeat(buf, &src);
+                process_heartbeat(buf, &src);
             }
         }
 

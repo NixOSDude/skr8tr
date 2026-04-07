@@ -89,13 +89,20 @@ Read the full technical breakdown: [Why We Killed Our Kubernetes Cluster](https:
 ## Features
 
 - **Post-Quantum Auth** — Every mutating command is ML-DSA-65 signed (NIST FIPS 204). The signing key never touches the wire. Replay protection built in.
-- **Rolling Updates** — `skr8tr rollout app.skr8tr` — launch new replicas, 8s settle, drain old ones. One command.
-- **HTTP Ingress** — Built-in reverse proxy. Longest-prefix route matching. Dynamic Tower lookup per request. No nginx config.
+- **Rolling Updates** — `skr8tr rollout app.skr8tr` — launch new replicas, health-probe gated, drain old ones. One command, zero downtime.
+- **HTTP/HTTPS Ingress** — Built-in TLS-terminating reverse proxy. Longest-prefix route matching. No nginx config. OpenSSL opt-in.
 - **Masterless Mesh** — UDP heartbeat discovery. Add a node by running the binary. No certificate approval, no kubeconfig rotation.
 - **Auto-Scaling** — CPU-triggered scale-up and scale-down. Min/max replica bounds. No metrics-server.
 - **Service Discovery** — Built-in Tower registry. Auto-register on launch, auto-deregister on kill. Round-robin across replicas.
 - **Health Checks** — HTTP GET probes, configurable interval/timeout/retries. Dead replicas killed and relaunched automatically.
 - **Log Streaming** — Per-process ring buffer. `skr8tr logs app` auto-resolves to the right node. No SSH required.
+- **Prometheus Metrics** — Every node exposes `/metrics` on port 9100. Scrape with any standard Prometheus stack.
+- **Remote Exec** — `skr8tr exec app <cmd>` — run a shell command inside any running workload across the mesh. No SSH.
+- **Restart Policy** — `restart always | on-failure | never` per manifest. Conductor rebalances on `never`.
+- **Persistent Volumes** — `volume {}` block in manifest — host paths injected as env vars post-fork.
+- **Graceful Drain** — Configurable `drain Ns` SIGTERM→SIGKILL window per workload.
+- **Secret Injection** — `secret {}` block — injected post-fork, never logged, never in UDP wire commands.
+- **Cryptographic Audit Ledger** — SHA-256 mini-blockchain. Every SUBMIT/EVICT/ROLLOUT/EXEC/AUTH_FAIL is chained. Tamper-evident. HIPAA § 164.312(b), HITRUST 09.aa/09.ac, NIST 800-53 AU-9/AU-10, PCI DSS 10.2, SOC 2 CC7.2 compliant.
 
 ---
 
@@ -132,6 +139,7 @@ app api-server
 
 - `gcc` with C23 support (`-std=gnu23`)
 - `liboqs` ≥ 0.15.0 (post-quantum crypto — [open-quantum-safe.org](https://openquantumsafe.org))
+- `openssl` ≥ 3.0 (TLS ingress + SHA-256 audit chain)
 - `rustup` + `cargo`
 - `pthread` (system)
 
@@ -197,6 +205,39 @@ Full documentation: [OPERATIONS.md](OPERATIONS.md)
 | 7771 | UDP | `skr8tr_sched` | Conductor — SUBMIT, EVICT, ROLLOUT, LIST |
 | 7772 | UDP | `skr8tr_reg` | Tower — REGISTER, LOOKUP |
 | 7775 | UDP | `skr8tr_node` | Node commands — LAUNCH, KILL, LOGS |
+
+---
+
+## Cryptographic Audit Ledger
+
+Every Conductor event is recorded in a SHA-256 mini-blockchain at `/var/log/skr8tr_audit.log`. The chain is tamper-evident: modifying any historical entry breaks every subsequent hash link, detectable instantly.
+
+```bash
+# Tail the last 50 audit entries
+skr8tr audit 50
+
+# Verify the entire chain from genesis
+skr8tr audit-verify
+```
+
+**Sample audit log entry:**
+```
+42|2026-04-06T14:22:11Z|SUBMIT|api-server|10.0.0.5|workload submitted|a3f9c2...e17b
+43|2026-04-06T14:22:15Z|ROLLOUT|api-server|10.0.0.5|rolling update initiated|9d2e4f...c83a
+44|2026-04-06T14:23:01Z|AUTH_FAIL||192.168.1.99|bad or missing ML-DSA-65 signature|f10c7d...a52b
+```
+
+**Compliance mapping:**
+
+| Standard | Control | How Skr8tr Satisfies It |
+|----------|---------|------------------------|
+| HIPAA § 164.312(b) | Audit Controls | All PHI system access logged with tamper-evident chain |
+| HITRUST CSF 09.aa | Audit Logging | Every operator action captured with timestamp + source IP |
+| HITRUST CSF 09.ac | Log Integrity | SHA-256 hash chain — any modification is detectable |
+| NIST 800-53 AU-9 | Audit Protection | Append-only log; `audit-verify` command for integrity checks |
+| NIST 800-53 AU-10 | Non-repudiation | ML-DSA-65 signed commands + hash over all fields |
+| PCI DSS 10.2 | Audit Events | All authentication, access, and admin actions recorded |
+| SOC 2 CC7.2 | Access Monitoring | Auth failures, privilege actions, process deaths all logged |
 
 ---
 

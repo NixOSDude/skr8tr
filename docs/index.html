@@ -408,6 +408,65 @@
       .nav-links { display: none; }
       .hero h1 { font-size: 2.4rem; }
     }
+
+    /* ── BLOG STRIP ── */
+    .blog-strip {
+      position: fixed;
+      top: 56px;
+      left: 0; right: 0;
+      z-index: 99;
+      background: rgba(8, 12, 16, 0.92);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      gap: 0.2rem;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .blog-strip::-webkit-scrollbar { display: none; }
+    .blog-strip-label {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      margin-right: 0.6rem;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .blog-strip a {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 500;
+      white-space: nowrap;
+      flex-shrink: 0;
+      padding: 0.1rem 0;
+      text-decoration: none;
+      transition: text-shadow 0.2s, opacity 0.2s;
+      opacity: 0.85;
+    }
+    .blog-strip a:hover { opacity: 1; text-decoration: none; }
+    .blog-strip .sep {
+      color: var(--border);
+      font-size: 0.7rem;
+      padding: 0 0.5rem;
+      flex-shrink: 0;
+    }
+    .bs-orange { color: var(--orange); text-shadow: 0 0 8px rgba(240,120,64,0.5); }
+    .bs-orange:hover { text-shadow: 0 0 14px rgba(240,120,64,0.85); }
+    .bs-cyan   { color: var(--cyan);   text-shadow: 0 0 8px rgba(0,212,255,0.45); }
+    .bs-cyan:hover   { text-shadow: 0 0 14px rgba(0,212,255,0.8); }
+    .bs-green  { color: var(--green);  text-shadow: 0 0 8px rgba(48,216,144,0.45); }
+    .bs-green:hover  { text-shadow: 0 0 14px rgba(48,216,144,0.8); }
+    .bs-gold   { color: var(--gold);   text-shadow: 0 0 8px rgba(240,176,32,0.45); }
+    .bs-gold:hover   { text-shadow: 0 0 14px rgba(240,176,32,0.8); }
+    .bs-purple { color: #c080ff;       text-shadow: 0 0 8px rgba(192,128,255,0.45); }
+    .bs-purple:hover { text-shadow: 0 0 14px rgba(192,128,255,0.8); }
+    /* push hero below both fixed bars */
+    body { padding-top: 88px; }
+    .hero { padding-top: 3rem; }
   </style>
 </head>
 <body>
@@ -426,6 +485,20 @@
     <li><a href="https://github.com/NixOSDude/skr8tr">GitHub</a></li>
   </ul>
 </nav>
+
+<!-- BLOG STRIP — sovereign reading list -->
+<div class="blog-strip">
+  <span class="blog-strip-label">&#x25B6; FROM THE BLOG:</span>
+  <a class="bs-orange" href="/blog/why-we-killed-kubernetes.html">Why We Killed Our Kubernetes Cluster</a>
+  <span class="sep">|</span>
+  <a class="bs-cyan" href="/blog/http-ingress-in-320-lines-of-c.html">HTTP Ingress in 320 Lines of C23</a>
+  <span class="sep">|</span>
+  <a class="bs-green" href="/blog/post-quantum-auth-no-passwords.html">Post-Quantum Auth — No Passwords</a>
+  <span class="sep">|</span>
+  <a class="bs-gold" href="/blog/rolling-updates-without-readiness-probes.html">Rolling Updates Without ReadinessProbes</a>
+  <span class="sep">|</span>
+  <a class="bs-purple" href="/blog/sovereign-market-9-microservices-no-kubernetes.html">9 Microservices. 3 Nodes. Zero Kubernetes.</a>
+</div>
 
 <!-- HERO -->
 <div class="hero">
