@@ -208,11 +208,9 @@ Skr8tr is open source and free to use. Need help deploying it or integrating it 
 
 | Service | Description |
 |---------|-------------|
-| **Cluster Setup** | We design and deploy your Skr8tr cluster — bare metal, cloud, or hybrid. Conductor HA, node fleet, ingress, PQC key provisioning. |
-| **Migration from k8s** | Full migration from Kubernetes: manifest conversion, ingress routing, CI/CD pipeline rework. |
-| **Architecture Review** | 2-hour deep dive into your current orchestration stack. Written recommendations delivered within 48 hours. |
-| **Training & Workshops** | Half-day or full-day team workshops. C23 systems programming, Skr8tr operations, post-quantum security fundamentals. |
-| **Ongoing Support** | Monthly retainer — SLA-backed response times, priority bug fixes, direct access. |
+| **Cluster Setup** | We design and deploy your Skr8tr cluster — bare metal, cloud, or hybrid. Full k8s migration, manifest conversion, ingress routing, CI/CD rework, PQC key provisioning. |
+| **Architecture Review** | Deep dive into your current orchestration stack. Written recommendations delivered within 48 hours. |
+| **Custom Development** | Bespoke features built to your requirements — SIEM adapters, compliance report generators, custom autoscale triggers, FedRAMP control mapping. |
 
 **Email:** [scott.bakerphx@gmail.com](mailto:scott.bakerphx@gmail.com) · **Website:** [skr8tr.online](https://skr8tr.online)
 
