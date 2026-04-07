@@ -53,6 +53,9 @@
             ],
             "styles": [
               "src/styles.scss"
+            ],
+            "polyfills": [
+              "zone.js"
             ]
           },
           "configurations": {
