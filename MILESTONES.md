@@ -8,7 +8,7 @@
 
 ## [2026-04-05] main — Sovereign Scaffold Initialized
 
-- Gitea repo created: http://192.168.68.50:3000/gitea/skr8tr
+- Gitea repo created: https://github.com/NixOSDude/skr8tr
 - CLAUDE.md: full federation laws, Skr8tr identity, language boundary law
 - Directory structure: src/core, src/daemon, src/parser, src/server, cli/, examples/
 - Companion project: LambdaC (gitea:LambdaC) — lvm_nodes are native Skr8tr workers
