@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="Skr8tr Blog — Engineering posts on sovereign infrastructure, workload orchestration, post-quantum security, and the death of Kubernetes." />
+  <link rel="icon" type="image/svg+xml" href="/skr8tr.svg" />
   <title>Skr8tr Blog — Sovereign Infrastructure</title>
   <style>
     :root {
@@ -41,9 +42,11 @@
       height: 56px;
       display: flex; align-items: center; justify-content: space-between;
     }
-    .nav-brand img {
-      height: 30px;
+    .nav-brand {
+      display: block;
+      height: 28px;
       width: auto;
+      max-width: 140px;
     }
     .nav-links { display: flex; gap: 1.8rem; list-style: none; }
     .nav-links a { color: var(--muted); font-size: 0.88rem; transition: color 0.2s; }
