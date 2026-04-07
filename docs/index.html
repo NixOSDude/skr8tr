@@ -1088,7 +1088,7 @@ skr8tr audit-verify      <span class="comment"># walk full chain — returns OK 
     </div>
     <div class="ef-card">
       <h4>&#x1F510; SSO / OIDC Identity Bridge</h4>
-      <p>Federate operator identity with Okta, Azure AD / Entra ID, or Google Workspace. PKCE OAuth2 flow → IdP validates identity → bridge issues a short-lived ML-DSA-65 session credential. Group claims map directly to Skr8tr RBAC teams.</p>
+      <p>Federate operator identity with Okta, Google Workspace, or any OIDC-compliant provider. OAuth2 flow → IdP validates identity → bridge issues a short-lived ML-DSA-65 session credential. Group claims map directly to Skr8tr RBAC namespaces.</p>
       <p style="margin-top:0.6rem;font-size:0.78rem;color:var(--gold);font-family:var(--font-mono);">ENTERPRISE ONLY</p>
     </div>
     <div class="ef-card">
@@ -1099,6 +1099,11 @@ skr8tr audit-verify      <span class="comment"># walk full chain — returns OK 
     <div class="ef-card">
       <h4>&#x1F4C8; Auto-Scaling</h4>
       <p>CPU, memory, queue depth, and arbitrary Prometheus metric triggers. Cron-based predictive scaling for known traffic patterns. AND/OR composite rules. Min/max replica bounds enforced at the Conductor. No metrics-server, no HPA objects.</p>
+      <p style="margin-top:0.6rem;font-size:0.78rem;color:var(--gold);font-family:var(--font-mono);">ENTERPRISE ONLY</p>
+    </div>
+    <div class="ef-card">
+      <h4>&#x26A1; HTTP/2 Ingress</h4>
+      <p>Full HTTP/2 with ALPN negotiation on the ingress — multiplexed streams, header compression, gRPC proxying. Compiled into <code>skr8tr_ingress</code> with TLS termination. The OSS ingress is HTTP/1.1; HTTP/2 is enterprise.</p>
       <p style="margin-top:0.6rem;font-size:0.78rem;color:var(--gold);font-family:var(--font-mono);">ENTERPRISE ONLY</p>
     </div>
   </div>
@@ -1138,7 +1143,7 @@ skr8tr audit-verify      <span class="comment"># walk full chain — returns OK 
         <li>SSO / OIDC bridge (Okta, Azure AD, Google)</li>
         <li>Multi-Tenant Conductor — unlimited namespaces</li>
         <li>Custom Metric Autoscale (memory, queue, Prometheus)</li>
-        <li>Slack / Teams channel — 4-hour response SLA</li>
+        <li>Slack channel — 4-hour response SLA</li>
         <li>Quarterly architecture review call</li>
       </ul>
       <a class="btn-enterprise solid" href="mailto:scott.bakerphx@gmail.com?subject=Skr8tr%20Business%20License">Start Business License &rarr;</a>
