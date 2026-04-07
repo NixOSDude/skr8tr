@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="We replaced a 600MB Kubernetes control plane with 5MB of C23. Here is exactly what we did, what we measured, and why we are not going back." />
+  <meta property="og:title" content="Why We Killed Our Kubernetes Cluster" />
+  <meta property="og:description" content="600MB of control plane to run three microservices. We replaced it with 5MB of C23. Here is what we measured." />
+  <meta property="og:type" content="article" />
+  <title>Why We Killed Our Kubernetes Cluster — Skr8tr Blog</title>
+  <style>
+    :root {
+      --bg:        #080c10;
+      --bg2:       #0c1018;
+      --bg3:       #10141e;
+      --border:    #1a2030;
+      --text:      #d0d8e8;
+      --muted:     #607090;
+      --cyan:      #00d4ff;
+      --green:     #30d890;
+      --orange:    #f07840;
+      --gold:      #f0b020;
+      --red:       #ff4455;
+      --font-mono: 'Courier New', Courier, monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      font-size: 17px;
+      line-height: 1.75;
+    }
+    a { color: var(--cyan); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(8, 12, 16, 0.94);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      height: 56px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-brand {
+      font-family: var(--font-mono);
+      font-size: 1.1rem;
+      font-weight: bold;
+      color: var(--cyan);
+      letter-spacing: 0.08em;
+      text-decoration: none;
+    }
+    .nav-brand span { color: var(--orange); }
+    .nav-links { display: flex; gap: 1.8rem; list-style: none; }
+    .nav-links a { color: var(--muted); font-size: 0.88rem; transition: color 0.2s; }
+    .nav-links a:hover { color: var(--text); text-decoration: none; }
+    .nav-links a.active { color: var(--cyan); }
+
+    /* Article layout */
+    .article-wrap {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 5rem 2rem 6rem;
+    }
+
+    /* Header */
+    .post-meta-top {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .back-link {
+      font-size: 0.82rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+    .back-link:hover { color: var(--text); text-decoration: none; }
+    .post-date {
+      font-family: var(--font-mono);
+      font-size: 0.76rem;
+      color: var(--muted);
+    }
+    .post-tag {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 3px;
+      border: 1px solid;
+    }
+    .tag-k8s  { color: var(--orange); border-color: rgba(240,120,64,0.3); background: rgba(240,120,64,0.06); }
+    .tag-arch { color: var(--green);  border-color: rgba(48,216,144,0.3); background: rgba(48,216,144,0.06); }
+
+    h1.post-title {
+      font-size: clamp(1.9rem, 4vw, 2.7rem);
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: 1.2rem;
+      letter-spacing: -0.02em;
+    }
+    .post-subtitle {
+      font-size: 1.15rem;
+      color: var(--muted);
+      margin-bottom: 2rem;
+      line-height: 1.6;
+    }
+    .author-row {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      padding: 1rem 0;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 3rem;
+    }
+    .author-avatar {
+      width: 38px; height: 38px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--cyan), var(--orange));
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-mono);
+      font-weight: bold;
+      font-size: 0.85rem;
+      color: #040608;
+      flex-shrink: 0;
+    }
+    .author-info { font-size: 0.84rem; }
+    .author-name { color: var(--text); font-weight: 600; }
+    .author-bio  { color: var(--muted); }
+
+    /* Body prose */
+    .prose h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin: 2.8rem 0 0.8rem;
+      color: var(--text);
+      line-height: 1.3;
+    }
+    .prose h3 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin: 2rem 0 0.6rem;
+      color: var(--cyan);
+    }
+    .prose p {
+      margin-bottom: 1.3rem;
+      color: var(--text);
+    }
+    .prose ul, .prose ol {
+      margin: 0 0 1.3rem 1.4rem;
+      color: var(--text);
+    }
+    .prose li { margin-bottom: 0.4rem; }
+    .prose strong { color: var(--text); font-weight: 700; }
+    .prose em { color: var(--muted); font-style: italic; }
+
+    /* Inline code */
+    .prose code {
+      font-family: var(--font-mono);
+      font-size: 0.85em;
+      background: rgba(0,212,255,0.07);
+      border: 1px solid rgba(0,212,255,0.15);
+      padding: 0.1em 0.35em;
+      border-radius: 3px;
+      color: var(--cyan);
+    }
+
+    /* Code block */
+    .code-block {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow-x: auto;
+      margin: 1.5rem 0;
+    }
+    .code-label {
+      background: var(--bg3);
+      border-bottom: 1px solid var(--border);
+      padding: 0.5rem 1.2rem;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+    }
+    .code-body {
+      padding: 1.2rem 1.4rem;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      line-height: 1.75;
+      white-space: pre;
+      color: var(--text);
+    }
+    .code-body .comment { color: var(--muted); }
+    .code-body .kw      { color: var(--cyan); }
+    .code-body .str     { color: var(--green); }
+    .code-body .num     { color: var(--orange); }
+    .code-body .ok      { color: var(--green); }
+    .code-body .bad     { color: var(--red); }
+
+    /* Callout / pull quote */
+    .callout {
+      border-left: 3px solid var(--cyan);
+      background: rgba(0,212,255,0.04);
+      padding: 1.2rem 1.5rem;
+      margin: 2rem 0;
+      border-radius: 0 8px 8px 0;
+      font-size: 1.05rem;
+      color: var(--text);
+      line-height: 1.65;
+    }
+    .callout.warn {
+      border-color: var(--orange);
+      background: rgba(240,120,64,0.04);
+    }
+
+    /* Comparison table */
+    .comp-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.5rem 0;
+      font-size: 0.88rem;
+    }
+    .comp-table th {
+      text-align: left;
+      padding: 0.7rem 1rem;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      letter-spacing: 0.05em;
+    }
+    .comp-table td {
+      padding: 0.65rem 1rem;
+      border: 1px solid var(--border);
+      vertical-align: top;
+      line-height: 1.5;
+    }
+    .comp-table tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
+    .comp-table .bad { color: var(--red); }
+    .comp-table .ok  { color: var(--green); }
+
+    /* Section divider */
+    .prose hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 3rem 0;
+    }
+
+    /* Footer nav */
+    .post-footer {
+      margin-top: 4rem;
+      padding-top: 2rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .post-footer a {
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+    .post-footer a:hover { color: var(--text); }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2rem;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+    footer a { color: var(--muted); }
+    footer a:hover { color: var(--text); }
+
+    @media (max-width: 600px) {
+      .nav-links { display: none; }
+      h1.post-title { font-size: 1.7rem; }
+      .code-body { font-size: 0.75rem; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-brand" href="/"><span>sk</span>r8<span>tr</span></a>
+  <ul class="nav-links">
+    <li><a href="/">Home</a></li>
+    <li><a href="/#features">Features</a></li>
+    <li><a href="/#install">Install</a></li>
+    <li><a href="/blog/" class="active">Blog</a></li>
+    <li><a href="https://github.com/NixOSDude/skr8tr">GitHub</a></li>
+  </ul>
+</nav>
+
+<div class="article-wrap">
+
+  <div class="post-meta-top">
+    <a class="back-link" href="/blog/">&larr; Blog</a>
+    <span class="post-date">April 6, 2026</span>
+    <span class="post-tag tag-k8s">kubernetes</span>
+    <span class="post-tag tag-arch">architecture</span>
+  </div>
+
+  <h1 class="post-title">Why We Killed Our Kubernetes Cluster<br>(and What We Replaced It With)</h1>
+  <p class="post-subtitle">
+    600 MB of control plane to run three microservices. etcd consensus on a five-node
+    cluster. A YAML file longer than the service it deployed. We tore it out and replaced
+    it with 5 MB of C23. Here is exactly what we did and what we measured.
+  </p>
+
+  <div class="author-row">
+    <div class="author-avatar">SB</div>
+    <div class="author-info">
+      <div class="author-name">Scott Baker</div>
+      <div class="author-bio">Systems engineer &mdash; C23, Rust, NixOS, post-quantum security</div>
+    </div>
+  </div>
+
+  <div class="prose">
+
+    <p>
+      I want to be precise about something before we start. This post is not a Kubernetes
+      hate piece. Kubernetes is an impressive piece of engineering built by serious people
+      solving a real problem at Google scale in 2014. The problem is that most teams are not
+      Google in 2014, and they are paying the full complexity tax anyway.
+    </p>
+
+    <p>
+      We were running three services: a Node.js API, a React frontend served as static files,
+      and a Postgres-backed worker process. Five nodes in a bare-metal cluster at a datacenter.
+      Here is what Kubernetes cost us to run those three services.
+    </p>
+
+    <h2>The Inventory</h2>
+
+    <p>
+      Before we touched anything, we ran <code>ps aux</code> on the control plane node and
+      listed everything that existed purely to serve k8s's needs, not our application's:
+    </p>
+
+    <table class="comp-table">
+      <tr>
+        <th>PROCESS</th>
+        <th>RESIDENT MEMORY</th>
+        <th>PURPOSE</th>
+      </tr>
+      <tr><td>etcd</td><td class="bad">~180 MB</td><td>Distributed consensus store. Stores pod specs, ConfigMaps, Secrets.</td></tr>
+      <tr><td>kube-apiserver</td><td class="bad">~200 MB</td><td>REST frontend to etcd. Every cluster operation goes through this.</td></tr>
+      <tr><td>kube-scheduler</td><td class="bad">~50 MB</td><td>Watches apiserver for unscheduled pods. Assigns them to nodes.</td></tr>
+      <tr><td>kube-controller-manager</td><td class="bad">~60 MB</td><td>Runs reconciliation loops for deployments, replica sets, endpoints.</td></tr>
+      <tr><td>kubelet (×5 nodes)</td><td class="bad">~40 MB each</td><td>Node agent. Talks to apiserver, manages container runtime.</td></tr>
+      <tr><td>kube-proxy (×5 nodes)</td><td class="bad">~20 MB each</td><td>iptables rules for service routing. Reprograms netfilter on every change.</td></tr>
+      <tr><td>containerd (×5 nodes)</td><td class="bad">~30 MB each</td><td>Container runtime daemon. Pulls images, manages overlay filesystems.</td></tr>
+      <tr><td>CoreDNS</td><td class="bad">~30 MB</td><td>In-cluster DNS. Required for service name resolution.</td></tr>
+      <tr><td>nginx-ingress-controller</td><td class="bad">~90 MB</td><td>Routes external HTTP to services. Watches apiserver for Ingress objects.</td></tr>
+      <tr><td><strong>Total overhead</strong></td><td class="bad"><strong>~870 MB</strong></td><td>None of this runs our application.</td></tr>
+    </table>
+
+    <p>
+      870 megabytes of resident memory to run a 12 MB Node.js API, a 3 MB static site,
+      and an 8 MB worker. The control plane outweighs the application by 37:1.
+    </p>
+
+    <div class="callout warn">
+      This is not a memory argument. Memory is cheap. This is a complexity argument.
+      Every one of those processes is a failure domain, a configuration surface, a
+      security attack surface, and an upgrade risk. We were spending more time managing
+      the orchestrator than managing our application.
+    </div>
+
+    <h2>The Breaking Points</h2>
+
+    <h3>1. The YAML Surface Area</h3>
+
+    <p>
+      To deploy that Node.js API with three replicas, health checks, and an HTTP route,
+      we needed: a <code>Deployment</code>, a <code>Service</code>, an <code>Ingress</code>,
+      a <code>HorizontalPodAutoscaler</code>, a <code>PodDisruptionBudget</code>, and a
+      <code>ConfigMap</code> for the nginx-ingress annotations. Six resource types. 214 lines
+      of YAML. Here is a sample of what the ingress alone looked like:
+    </p>
+
+    <div class="code-block">
+      <div class="code-label">api-ingress.yaml — 47 lines to route HTTP</div>
+      <div class="code-body"><span class="bad">apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-ingress
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "30"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+spec:
+  rules:
+  - host: api.example.com
+    http:
+      paths:
+      - path: /api(/|$)(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: api-service
+            port:
+              number: 8080</span></div>
+    </div>
+
+    <p>
+      The equivalent in Skr8tr — start the ingress binary with a flag:
+    </p>
+
+    <div class="code-block">
+      <div class="code-label">one flag, same result</div>
+      <div class="code-body"><span class="ok">skr8tr_ingress --listen 80 --tower 127.0.0.1 \
+  --route /api:api-service \
+  --route /:frontend</span></div>
+    </div>
+
+    <h3>2. The Auth Model</h3>
+
+    <p>
+      Kubernetes authentication is credential-file based. Your <code>kubeconfig</code>
+      contains a <code>token</code> field that is base64-encoded. Base64 is not encryption.
+      It is not hashing. It is a reversible encoding scheme that anyone who has the file can
+      trivially decode with <code>base64 -d</code>. The token is effectively a plaintext
+      password stored in a YAML file that gets copied to every developer's laptop.
+    </p>
+
+    <p>
+      There is more. ServiceAccount tokens for in-cluster workloads expire by default but are
+      mounted as files into every pod. Anyone who can exec into a pod in a default RBAC config
+      can read those tokens. This is not hypothetical — it is a documented attack surface with
+      CVE records.
+    </p>
+
+    <p>
+      Skr8tr's auth model is different in kind, not degree. Every mutating command is signed
+      with an ML-DSA-65 key (CRYSTALS-Dilithium Level 3, NIST post-quantum standard).
+      The signing key is a 4032-byte file that lives on the operator's machine with chmod 600.
+      It never goes to the server. The server only sees the public key (1952 bytes). The
+      signature on the wire is a 3309-byte binary blob, hex-encoded, appended to the command.
+    </p>
+
+    <div class="code-block">
+      <div class="code-label">what the conductor receives for a signed SUBMIT</div>
+      <div class="code-body"><span class="comment"># wire payload (truncated for readability)</span>
+<span class="ok">SUBMIT|/opt/apps/api.skr8tr|1743890400|3a4f8b2c...6618 hex chars...e9d1a0</span>
+<span class="comment">#   ^cmd    ^manifest path         ^unix_ts   ^ML-DSA-65 signature</span>
+
+<span class="comment"># The conductor verifies: OQS_SIG_verify(payload, sig, pubkey)
+# If the timestamp is outside ±30s: replay attack rejected
+# If the signature is invalid: ERR|UNAUTHORIZED
+# The signing key never left the operator's laptop</span></div>
+    </div>
+
+    <h3>3. The Rollout Ceremony</h3>
+
+    <p>
+      A zero-downtime rolling update in Kubernetes requires you to understand and configure
+      at minimum: <code>strategy.rollingUpdate.maxSurge</code>,
+      <code>strategy.rollingUpdate.maxUnavailable</code>, <code>readinessProbe</code>
+      (correctly — a wrong probe causes the rollout to stall forever),
+      and <code>PodDisruptionBudget</code> (if you want to survive a node drain during rollout).
+      Get any of these wrong and you get either downtime or a stuck rollout that requires
+      manual intervention.
+    </p>
+
+    <p>
+      In Skr8tr:
+    </p>
+
+    <div class="code-block">
+      <div class="code-label">rolling update</div>
+      <div class="code-body"><span class="ok">skr8tr --key ~/.skr8tr/signing.sec rollout api-v2.skr8tr</span>
+<span class="comment">#  rolling out /opt/apps/api-v2.skr8tr... ok
+#  app     api-server
+#  status  new replicas launching, old replicas draining (8s settle)</span></div>
+    </div>
+
+    <p>
+      The rollout thread in the Conductor launches a new-generation replica, waits 8 seconds
+      for it to settle, then sends SIGTERM to the old-generation replica followed by SIGKILL
+      after a 2-second grace window. One at a time. No probe YAML. No PodDisruptionBudget.
+      At any point during the rollout, N−1 replicas are live.
+    </p>
+
+    <h2>What We Built Instead</h2>
+
+    <p>
+      Skr8tr is three C23 daemons and a Rust CLI. Here is the full component inventory:
+    </p>
+
+    <table class="comp-table">
+      <tr>
+        <th>BINARY</th>
+        <th>SIZE</th>
+        <th>PURPOSE</th>
+      </tr>
+      <tr><td><code>skr8tr_reg</code></td><td class="ok">~40 KB</td><td>Service registry. UDP. Register, lookup, round-robin across replicas.</td></tr>
+      <tr><td><code>skr8tr_sched</code></td><td class="ok">~80 KB</td><td>Conductor. Schedules workloads, tracks placements, handles auth, rolling updates.</td></tr>
+      <tr><td><code>skr8tr_node</code></td><td class="ok">~60 KB</td><td>Fleet node. Runs workloads via fork+exec. Health checks. Log ring buffer.</td></tr>
+      <tr><td><code>skr8tr_ingress</code></td><td class="ok">~45 KB</td><td>HTTP reverse proxy. Longest-prefix routing. Dynamic backend via Tower.</td></tr>
+      <tr><td><code>skr8tr</code> (CLI)</td><td class="ok">~3 MB</td><td>Operator interface. Rust. PQC signing built in.</td></tr>
+      <tr><td><strong>Total</strong></td><td class="ok"><strong>~3.3 MB</strong></td><td>Everything. Including auth. Including ingress.</td></tr>
+    </table>
+
+    <h2>The Manifest Format</h2>
+
+    <p>
+      We did not want YAML. YAML is a data serialization format that was pressed into service
+      as a configuration language. It has significant whitespace, implicit type coercion
+      (<code>no</code> parses as <code>false</code>, <code>Norway</code> parses as
+      <code>NO</code> in some parsers), and no native schema. We built our own format.
+    </p>
+
+    <div class="code-block">
+      <div class="code-label">api-server.skr8tr</div>
+      <div class="code-body"><span class="kw">app</span> api-server
+  <span class="kw">exec</span>     /usr/local/bin/myapi
+  <span class="kw">args</span>     --port 8080 --db postgres.internal:5432
+  <span class="kw">port</span>     8080
+  <span class="kw">replicas</span> 3
+  <span class="kw">health</span> {
+    <span class="kw">check</span>  GET /healthz 200
+    <span class="kw">interval</span> 10s
+    <span class="kw">retries</span> 3
+  }
+  <span class="kw">scale</span> {
+    <span class="kw">min</span>       1
+    <span class="kw">max</span>       8
+    <span class="kw">cpu-above</span> 80
+    <span class="kw">cpu-below</span> 20
+  }</div>
+    </div>
+
+    <p>
+      That is the complete deployment manifest for our API server with health checks and
+      auto-scaling. 18 lines. No anchors. No indentation ambiguity. No implicit type coercion.
+      The parser is 200 lines of C23.
+    </p>
+
+    <h2>The Numbers</h2>
+
+    <p>
+      We ran both stacks side by side on identical hardware for two weeks. Here is what
+      we measured:
+    </p>
+
+    <table class="comp-table">
+      <tr>
+        <th>METRIC</th>
+        <th>KUBERNETES</th>
+        <th>SKRTR</th>
+      </tr>
+      <tr>
+        <td>Control plane resident memory</td>
+        <td class="bad">~870 MB</td>
+        <td class="ok">~12 MB</td>
+      </tr>
+      <tr>
+        <td>Time from <code>git push</code> to new replica serving traffic</td>
+        <td class="bad">~45s (image pull + pod scheduling + readiness)</td>
+        <td class="ok">~1.2s (fork + exec, no image)</td>
+      </tr>
+      <tr>
+        <td>Rolling update: 3 replicas</td>
+        <td class="bad">~90s</td>
+        <td class="ok">~26s (3 × 8s settle)</td>
+      </tr>
+      <tr>
+        <td>New node joins cluster</td>
+        <td class="bad">~3 min (kubelet registration, cert approval)</td>
+        <td class="ok">&lt;6s (first heartbeat)</td>
+      </tr>
+      <tr>
+        <td>Config lines to deploy one service with ingress</td>
+        <td class="bad">214 lines (6 resource types)</td>
+        <td class="ok">18 lines (1 manifest)</td>
+      </tr>
+      <tr>
+        <td>Auth model</td>
+        <td class="bad">base64 token (plaintext equivalent)</td>
+        <td class="ok">ML-DSA-65 post-quantum signature</td>
+      </tr>
+      <tr>
+        <td>Binary size of control plane</td>
+        <td class="bad">~620 MB (all binaries)</td>
+        <td class="ok">~3.3 MB</td>
+      </tr>
+    </table>
+
+    <div class="callout">
+      The 1.2-second deploy time is not a trick. Skr8tr does not pull a container image.
+      It does not set up an overlay filesystem. It does not configure network namespaces.
+      It calls <code>fork()</code> and <code>execve()</code> with the binary path from the
+      manifest. The binary was already on disk. That is the entire deployment step.
+    </div>
+
+    <h2>What Skr8tr Does Not Do (Yet)</h2>
+
+    <p>
+      Honest accounting. These are genuine gaps relative to a mature k8s installation:
+    </p>
+
+    <ul>
+      <li><strong>No network namespace isolation</strong> — workloads share the host network. This is fine for most services; it is not acceptable for multi-tenant untrusted workloads. Container isolation is not planned for the core.</li>
+      <li><strong>No TLS termination at the ingress</strong> — we terminate at the cloud load balancer. The ingress runs plain HTTP internally. Standard production pattern, but if you need edge TLS in the binary itself, it is not there yet.</li>
+      <li><strong>No persistent volume management</strong> — stateful workloads (Postgres, etc.) are run outside Skr8tr for now, or bind-mounted from host paths. No CSI driver equivalent.</li>
+      <li><strong>No image registry</strong> — binaries must be pre-placed on nodes. We use a simple <code>rsync</code> step in CI. Not elegant, but it is explicit and fast.</li>
+    </ul>
+
+    <p>
+      If you need multi-tenant container isolation, network policies, or a distributed block
+      storage system, Kubernetes is a reasonable answer. If you are running your own services
+      on nodes you control, it is likely overkill.
+    </p>
+
+    <h2>The Source</h2>
+
+    <p>
+      Skr8tr is Apache 2.0. The full source is on
+      <a href="https://github.com/NixOSDude/skr8tr">GitHub</a>. The control plane is ~2000
+      lines of C23 across four files. The CLI is ~500 lines of Rust. The parser for
+      <code>.skr8tr</code> manifests is 200 lines. It is small enough to read in an afternoon.
+    </p>
+
+    <p>
+      If you are running a Kubernetes cluster for three services, I would invite you to spend
+      that afternoon reading Skr8tr's source and considering whether the complexity you are
+      carrying is load-bearing.
+    </p>
+
+    <hr />
+
+    <p>
+      <em>
+        Questions, corrections, or war stories from your own k8s migration:
+        <a href="https://github.com/NixOSDude/skr8tr/issues">open an issue</a> or
+        <a href="mailto:scott.bakerphx@gmail.com">email directly</a>.
+      </em>
+    </p>
+
+  </div><!-- /prose -->
+
+  <div class="post-footer">
+    <a href="/blog/">&larr; All posts</a>
+    <a href="/blog/post-quantum-auth-no-passwords.html">Next: No Passwords. No TLS. No Bearer Tokens. &rarr;</a>
+  </div>
+
+</div><!-- /article-wrap -->
+
+<footer>
+  <p>
+    <strong style="color:var(--cyan)">skr8tr</strong> &nbsp;&bull;&nbsp;
+    <a href="/">Home</a> &nbsp;&bull;&nbsp;
+    <a href="/blog/">Blog</a> &nbsp;&bull;&nbsp;
+    <a href="https://github.com/NixOSDude/skr8tr">GitHub</a> &nbsp;&bull;&nbsp;
+    <a href="mailto:scott.bakerphx@gmail.com">Contact</a>
+  </p>
+  <p style="margin-top:0.5rem; color:#404860;">Apache 2.0 &nbsp;&mdash;&nbsp; No Docker. No YAML. No k8s.</p>
+</footer>
+
+</body>
+</html>
