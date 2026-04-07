@@ -59,9 +59,7 @@
       padding: 5rem 2rem 6rem;
     }
 
-    .blog-header {
-      margin-bottom: 3.5rem;
-    }
+    .blog-header { margin-bottom: 3.5rem; }
     .blog-label {
       font-family: var(--font-mono);
       font-size: 0.75rem;
@@ -80,7 +78,6 @@
       max-width: 560px;
     }
 
-    /* Post card */
     .post-list { display: flex; flex-direction: column; gap: 1.5rem; }
     .post-card {
       background: var(--bg2);
@@ -97,6 +94,8 @@
       transform: translateY(-2px);
       text-decoration: none;
     }
+    .post-card.stub { opacity: 0.65; cursor: default; }
+    .post-card.stub:hover { transform: none; border-color: var(--border); }
     .post-meta {
       display: flex;
       align-items: center;
@@ -116,11 +115,12 @@
       border-radius: 3px;
       border: 1px solid;
     }
-    .tag-k8s    { color: var(--orange); border-color: rgba(240,120,64,0.3); background: rgba(240,120,64,0.06); }
-    .tag-pqc    { color: var(--cyan);   border-color: rgba(0,212,255,0.3);  background: rgba(0,212,255,0.06); }
-    .tag-arch   { color: var(--green);  border-color: rgba(48,216,144,0.3); background: rgba(48,216,144,0.06); }
-    .tag-perf   { color: var(--gold);   border-color: rgba(240,176,32,0.3); background: rgba(240,176,32,0.06); }
-    .tag-ops    { color: var(--muted);  border-color: rgba(96,112,144,0.3); background: rgba(96,112,144,0.06); }
+    .tag-k8s    { color: var(--orange); border-color: rgba(240,120,64,0.3);  background: rgba(240,120,64,0.06); }
+    .tag-pqc    { color: var(--cyan);   border-color: rgba(0,212,255,0.3);   background: rgba(0,212,255,0.06); }
+    .tag-arch   { color: var(--green);  border-color: rgba(48,216,144,0.3);  background: rgba(48,216,144,0.06); }
+    .tag-perf   { color: var(--gold);   border-color: rgba(240,176,32,0.3);  background: rgba(240,176,32,0.06); }
+    .tag-ops    { color: var(--muted);  border-color: rgba(96,112,144,0.3);  background: rgba(96,112,144,0.06); }
+    .tag-coming { color: var(--muted);  border-color: rgba(96,112,144,0.2);  background: transparent; font-style: italic; }
 
     .post-card h2 {
       font-size: 1.25rem;
@@ -129,11 +129,7 @@
       color: var(--text);
       line-height: 1.3;
     }
-    .post-card p {
-      color: var(--muted);
-      font-size: 0.9rem;
-      line-height: 1.6;
-    }
+    .post-card p { color: var(--muted); font-size: 0.9rem; line-height: 1.6; }
     .post-read-more {
       display: inline-flex;
       align-items: center;
@@ -144,7 +140,6 @@
       font-weight: 500;
     }
 
-    /* Featured post */
     .post-card.featured {
       border-color: rgba(0,212,255,0.2);
       background: linear-gradient(135deg, rgba(0,212,255,0.04) 0%, var(--bg2) 60%);
@@ -194,87 +189,83 @@
 <div class="page">
   <div class="blog-header">
     <div class="blog-label">// SKRTR ENGINEERING BLOG</div>
-    <h1>Sovereign Infrastructure<br>Field Notes</h1>
+    <h1>Built in public.<br>No fluff.</h1>
     <p>
-      Engineering posts on workload orchestration, post-quantum security, bare-metal
-      performance, and why Kubernetes is the wrong answer for most teams.
+      Engineering posts on exactly what we built, why we built it, and what we measured.
+      Hardware: Arch Linux, 20-core workstation, RTX 3060, NixOS packages, single local node.
+      No marketing. No benchmarks we did not run.
     </p>
   </div>
 
   <div class="post-list">
 
+    <!-- POST 1 — EXISTS -->
     <a class="post-card featured" href="/blog/why-we-killed-kubernetes.html">
       <div class="post-meta">
-        <span class="featured-badge">FEATURED</span>
+        <span class="featured-badge">PUBLISHED</span>
         <span class="post-date">2026-04-06</span>
         <span class="post-tag tag-k8s">kubernetes</span>
         <span class="post-tag tag-arch">architecture</span>
       </div>
       <h2>Why We Killed Our Kubernetes Cluster (and What We Replaced It With)</h2>
       <p>
-        600 MB of control plane to run three microservices. etcd consensus overhead on a
-        five-node cluster. A YAML file longer than the service it described. We tore it out
-        and replaced it with 5 MB of C23. Here is exactly what we did and what we measured.
+        The honest accounting: 870 MB of control plane to run three services, base64 bearer tokens
+        dressed up as auth, and 214 lines of YAML to route HTTP. We replaced it with three C23
+        binaries. Here is the component-by-component breakdown and what the numbers actually looked like.
       </p>
       <span class="post-read-more">Read post &rarr;</span>
     </a>
 
+    <!-- POST 2 — EXISTS -->
     <a class="post-card" href="/blog/post-quantum-auth-no-passwords.html">
       <div class="post-meta">
+        <span class="featured-badge" style="color:var(--green);background:rgba(48,216,144,0.08);border-color:rgba(48,216,144,0.25);">PUBLISHED</span>
         <span class="post-date">2026-04-06</span>
         <span class="post-tag tag-pqc">post-quantum</span>
         <span class="post-tag tag-ops">security</span>
       </div>
-      <h2>No Passwords. No TLS Certs. No Bearer Tokens. Just ML-DSA-65.</h2>
+      <h2>No Passwords. No TLS Certs. No Bearer Tokens. ML-DSA-65 in 400 Lines of C.</h2>
       <p>
-        Kubernetes ships kubeconfig files containing base64-encoded secrets — effectively plaintext
-        with extra steps. We replaced the entire auth model with post-quantum digital signatures.
-        Every command is signed. The signing key never touches the network.
+        How we replaced Kubernetes kubeconfig tokens with ML-DSA-65 post-quantum signatures.
+        Every SUBMIT and EVICT command is signed on the operator machine, verified by the Conductor.
+        The signing key never touches the wire. Built on liboqs 0.15, tested end-to-end on
+        a single workstation running Arch Linux.
       </p>
       <span class="post-read-more">Read post &rarr;</span>
     </a>
 
-    <a class="post-card" href="/blog/the-5mb-control-plane.html">
-      <div class="post-meta">
-        <span class="post-date">2026-04-07</span>
-        <span class="post-tag tag-arch">architecture</span>
-        <span class="post-tag tag-perf">performance</span>
-      </div>
-      <h2>The 5 MB Control Plane: How Skr8tr Fits in a Docker Scratch Image</h2>
-      <p>
-        Three C23 binaries. No garbage collector. No runtime. No container daemon.
-        A Skr8tr cluster starts in under a second on a Raspberry Pi 4. Here is the
-        architectural breakdown and the design decisions that got us here.
-      </p>
-      <span class="post-read-more">Read post &rarr;</span>
-    </a>
-
+    <!-- POST 3 — EXISTS -->
     <a class="post-card" href="/blog/rolling-updates-without-readiness-probes.html">
       <div class="post-meta">
-        <span class="post-date">2026-04-08</span>
+        <span class="featured-badge" style="color:var(--green);background:rgba(48,216,144,0.08);border-color:rgba(48,216,144,0.25);">PUBLISHED</span>
+        <span class="post-date">2026-04-06</span>
         <span class="post-tag tag-ops">operations</span>
         <span class="post-tag tag-arch">architecture</span>
       </div>
       <h2>Rolling Updates Without ReadinessProbes, PodDisruptionBudgets, or YAML</h2>
       <p>
-        k8s rolling updates require five separate resource types and a prayer that your
-        readiness probe is actually meaningful. Skr8tr does it in one command. Here is
-        how the rollout thread works under the hood.
+        We built a rolling update system in a single pthread. Launch new-generation replica,
+        wait 8 seconds, kill old-generation replica — one at a time, no probe configuration,
+        no strategy objects. Here is the rollout_thread implementation and the verified
+        end-to-end test we ran on our local cluster.
       </p>
       <span class="post-read-more">Read post &rarr;</span>
     </a>
 
+    <!-- POST 4 — EXISTS -->
     <a class="post-card" href="/blog/http-ingress-in-320-lines-of-c.html">
       <div class="post-meta">
-        <span class="post-date">2026-04-09</span>
+        <span class="featured-badge" style="color:var(--green);background:rgba(48,216,144,0.08);border-color:rgba(48,216,144,0.25);">PUBLISHED</span>
+        <span class="post-date">2026-04-06</span>
         <span class="post-tag tag-arch">architecture</span>
         <span class="post-tag tag-perf">performance</span>
       </div>
-      <h2>HTTP Ingress in 320 Lines of C23 (No nginx, No Envoy, No Helm)</h2>
+      <h2>HTTP Ingress in 320 Lines of C23 — No nginx, No Envoy, No Helm</h2>
       <p>
-        The nginx ingress controller for Kubernetes is a 90 MB container that wraps nginx
-        with a sidecar that reads ConfigMaps. We replaced it with 320 lines of C23 that
-        compiles to 40 KB and resolves backends dynamically via UDP.
+        skr8tr_ingress: a reverse proxy that resolves backends dynamically via UDP Tower lookup
+        on every request. Longest-prefix route matching, MAX_RETRY=3 failover, X-Forwarded-For
+        injection, bidirectional select() proxy loop. Built, compiled clean, and verified
+        end-to-end with curl on the same Arch Linux workstation we develop on.
       </p>
       <span class="post-read-more">Read post &rarr;</span>
     </a>
@@ -287,7 +278,7 @@
     <strong style="color:var(--cyan)">skr8tr</strong> &nbsp;&bull;&nbsp;
     <a href="/">Home</a> &nbsp;&bull;&nbsp;
     <a href="https://github.com/NixOSDude/skr8tr">GitHub</a> &nbsp;&bull;&nbsp;
-    <a href="mailto:scott.bakerphx@gmail.com">Contact</a>
+    <a href="mailto:hello@skr8tr.online">hello@skr8tr.online</a>
   </p>
   <p style="margin-top:0.5rem; color:#404860;">Apache 2.0 &nbsp;&mdash;&nbsp; No Docker. No YAML. No k8s.</p>
 </footer>

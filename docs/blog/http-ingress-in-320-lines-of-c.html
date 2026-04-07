@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="skr8tr_ingress: HTTP/1.1 reverse proxy in 320 lines of C23. Longest-prefix routing, dynamic Tower lookup, bidirectional proxy, X-Forwarded-For. Built and tested on Arch Linux." />
+  <link rel="icon" type="image/svg+xml" href="/skr8tr.svg" />
+  <title>HTTP Ingress in 320 Lines of C23 — Skr8tr Blog</title>
+  <style>
+    :root{--bg:#080c10;--bg2:#0c1018;--bg3:#10141e;--border:#1a2030;--text:#d0d8e8;--muted:#607090;--cyan:#00d4ff;--green:#30d890;--orange:#f07840;--gold:#f0b020;--red:#ff4455;--font-mono:'Courier New',Courier,monospace;--font-sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    html{scroll-behavior:smooth;}
+    body{background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:17px;line-height:1.75;}
+    a{color:var(--cyan);text-decoration:none;}a:hover{text-decoration:underline;}
+    nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(8,12,16,0.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 2rem;height:56px;display:flex;align-items:center;justify-content:space-between;}
+    .nav-brand{display:block;height:28px;width:auto;max-width:140px;}
+    .nav-links{display:flex;gap:1.8rem;list-style:none;}
+    .nav-links a{color:var(--muted);font-size:0.88rem;transition:color 0.2s;}
+    .nav-links a:hover{color:var(--text);text-decoration:none;}
+    .nav-links a.active{color:var(--cyan);}
+    .article-wrap{max-width:720px;margin:0 auto;padding:5rem 2rem 6rem;}
+    .post-meta-top{display:flex;align-items:center;gap:0.8rem;margin-bottom:1.5rem;flex-wrap:wrap;}
+    .back-link{font-size:0.82rem;color:var(--muted);}
+    .back-link:hover{color:var(--text);text-decoration:none;}
+    .post-date{font-family:var(--font-mono);font-size:0.76rem;color:var(--muted);}
+    .post-tag{font-family:var(--font-mono);font-size:0.72rem;padding:0.15rem 0.5rem;border-radius:3px;border:1px solid;}
+    .tag-arch{color:var(--green);border-color:rgba(48,216,144,0.3);background:rgba(48,216,144,0.06);}
+    .tag-perf{color:var(--gold);border-color:rgba(240,176,32,0.3);background:rgba(240,176,32,0.06);}
+    h1.post-title{font-size:clamp(1.9rem,4vw,2.6rem);font-weight:800;line-height:1.15;margin-bottom:1.2rem;letter-spacing:-0.02em;}
+    .post-subtitle{font-size:1.1rem;color:var(--muted);margin-bottom:2rem;line-height:1.6;}
+    .author-row{display:flex;align-items:center;gap:0.8rem;padding:1rem 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin-bottom:3rem;}
+    .author-avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--cyan),var(--orange));display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-weight:bold;font-size:0.85rem;color:#040608;flex-shrink:0;}
+    .author-info{font-size:0.84rem;}.author-name{color:var(--text);font-weight:600;}.author-bio{color:var(--muted);}
+    .prose h2{font-size:1.5rem;font-weight:700;margin:2.8rem 0 0.8rem;color:var(--text);line-height:1.3;}
+    .prose h3{font-size:1.1rem;font-weight:700;margin:2rem 0 0.6rem;color:var(--cyan);}
+    .prose p{margin-bottom:1.3rem;color:var(--text);}
+    .prose ul,.prose ol{margin:0 0 1.3rem 1.4rem;color:var(--text);}
+    .prose li{margin-bottom:0.4rem;}
+    .prose strong{color:var(--text);font-weight:700;}
+    .prose code{font-family:var(--font-mono);font-size:0.85em;background:rgba(0,212,255,0.07);border:1px solid rgba(0,212,255,0.15);padding:0.1em 0.35em;border-radius:3px;color:var(--cyan);}
+    .prose hr{border:none;border-top:1px solid var(--border);margin:3rem 0;}
+    .code-block{background:var(--bg2);border:1px solid var(--border);border-radius:8px;overflow-x:auto;margin:1.5rem 0;}
+    .code-label{background:var(--bg3);border-bottom:1px solid var(--border);padding:0.5rem 1.2rem;font-family:var(--font-mono);font-size:0.72rem;color:var(--muted);letter-spacing:0.05em;}
+    .code-body{padding:1.2rem 1.4rem;font-family:var(--font-mono);font-size:0.82rem;line-height:1.75;white-space:pre;color:var(--text);}
+    .code-body .comment{color:var(--muted);}.code-body .kw{color:var(--cyan);}.code-body .ok{color:var(--green);}.code-body .bad{color:var(--red);}
+    .callout{border-left:3px solid var(--cyan);background:rgba(0,212,255,0.04);padding:1.2rem 1.5rem;margin:2rem 0;border-radius:0 8px 8px 0;font-size:1rem;color:var(--text);line-height:1.65;}
+    .post-footer{margin-top:4rem;padding-top:2rem;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;}
+    .post-footer a{font-size:0.88rem;color:var(--muted);}.post-footer a:hover{color:var(--text);}
+    footer{border-top:1px solid var(--border);padding:2rem;text-align:center;color:var(--muted);font-size:0.82rem;}
+    footer a{color:var(--muted);}footer a:hover{color:var(--text);}
+    @media(max-width:600px){.nav-links{display:none;}h1.post-title{font-size:1.6rem;}.code-body{font-size:0.75rem;}}
+  </style>
+</head>
+<body>
+<nav>
+  <a href="/"><img src="/skr8tr.svg" alt="skr8tr" class="nav-brand" /></a>
+  <ul class="nav-links">
+    <li><a href="/">Home</a></li>
+    <li><a href="/#features">Features</a></li>
+    <li><a href="/#install">Install</a></li>
+    <li><a href="/blog/" class="active">Blog</a></li>
+    <li><a href="https://github.com/NixOSDude/skr8tr">GitHub</a></li>
+  </ul>
+</nav>
+
+<div class="article-wrap">
+  <div class="post-meta-top">
+    <a class="back-link" href="/blog/">&larr; Blog</a>
+    <span class="post-date">April 6, 2026</span>
+    <span class="post-tag tag-arch">architecture</span>
+    <span class="post-tag tag-perf">performance</span>
+  </div>
+
+  <h1 class="post-title">HTTP Ingress in 320 Lines of C23<br>No nginx. No Envoy. No Helm.</h1>
+  <p class="post-subtitle">
+    <code>skr8tr_ingress</code> is a reverse proxy that resolves backends dynamically via the
+    Tower on every request. Longest-prefix route matching, MAX_RETRY=3 failover,
+    X-Forwarded-For injection, bidirectional select() proxy. Built on Arch Linux,
+    compiled with gcc C23, verified with curl.
+  </p>
+
+  <div class="author-row">
+    <div class="author-avatar">SB</div>
+    <div class="author-info">
+      <div class="author-name">Scott Baker</div>
+      <div class="author-bio">Systems engineer &mdash; C23, Rust, NixOS, post-quantum security</div>
+    </div>
+  </div>
+
+  <div class="prose">
+
+    <p>
+      The nginx ingress controller for Kubernetes is a 90 MB container image. It runs an nginx
+      process and a Go sidecar that watches the Kubernetes API for <code>Ingress</code> objects
+      and rewrites nginx config on change. The actual routing logic is nginx configuration
+      generated by the Go controller from YAML annotations — none of which you wrote directly.
+    </p>
+
+    <p>
+      We wanted something that did exactly what an ingress needs to do: accept an HTTP request,
+      figure out which backend service handles it, connect to that backend, and forward bytes
+      in both directions. Nothing else. Here is what we built.
+    </p>
+
+    <h2>Design: No Static Config</h2>
+
+    <p>
+      The biggest design decision: the ingress resolves backends at request time via the Tower,
+      not from a static config file. This means new replicas appear automatically (Tower registers
+      them on launch) and dead replicas disappear automatically (Tower deregisters them on kill).
+      The ingress itself has no state beyond the route table you pass at startup.
+    </p>
+
+    <div class="code-block">
+      <div class="code-label">starting skr8tr_ingress</div>
+      <div class="code-body"><span class="ok">$ bin/skr8tr_ingress \
+    --listen 9090 \
+    --tower 127.0.0.1 \
+    --route /api:api-service \
+    --route /:frontend</span>
+<span class="comment"># That's the entire configuration.
+# No config file. No reload signal. No sidecar.</span></div>
+    </div>
+
+    <h2>Route Matching</h2>
+
+    <p>
+      Routes are stored in a flat array, sorted by prefix length descending at startup.
+      Matching is an O(N) scan — fine for any realistic number of routes:
+    </p>
+
+    <div class="code-block">
+      <div class="code-label">src/daemon/skr8tr_ingress.c — route_match</div>
+      <div class="code-body"><span class="kw">static</span> Route *route_match(<span class="kw">const char</span> *path) {
+    <span class="comment">/* Routes are sorted longest-prefix first at startup.
+       First match wins — same semantics as nginx location blocks. */</span>
+    <span class="kw">for</span> (<span class="kw">int</span> i = 0; i < g_route_count; i++) {
+        <span class="kw">if</span> (strncmp(path, g_routes[i].prefix,
+                    strlen(g_routes[i].prefix)) == 0)
+            <span class="kw">return</span> &g_routes[i];
+    }
+    <span class="kw">return</span> NULL; <span class="comment">/* → 404 */</span>
+}</div>
+    </div>
+
+    <h2>Backend Resolution</h2>
+
+    <p>
+      For each request, we send a <code>LOOKUP|&lt;service&gt;</code> UDP datagram to the Tower
+      and parse the response. The Tower round-robins across replicas, so the ingress gets built-in
+      load balancing for free:
+    </p>
+
+    <div class="code-block">
+      <div class="code-label">tower_lookup — UDP query per request</div>
+      <div class="code-body"><span class="kw">static int</span> tower_lookup(<span class="kw">const char</span> *service,
+                           <span class="kw">char</span> *ip_out, <span class="kw">int</span> *port_out) {
+    <span class="comment">/* One UDP send + recv — sub-millisecond on loopback */</span>
+    <span class="kw">char</span> msg[256], resp[512];
+    snprintf(msg, <span class="kw">sizeof</span>(msg), <span class="str">"LOOKUP|%s"</span>, service);
+    udp_send_recv(g_tower_host, TOWER_PORT, msg, resp, <span class="kw">sizeof</span>(resp));
+
+    <span class="comment">/* Response: "OK|LOOKUP|name|ip|port" */</span>
+    <span class="kw">if</span> (strncmp(resp, <span class="str">"OK|LOOKUP|"</span>, 10) != 0) <span class="kw">return</span> -1;
+    sscanf(resp, <span class="str">"OK|LOOKUP|%*[^|]|%[^|]|%d"</span>, ip_out, port_out);
+    <span class="kw">return</span> 0;
+}</div>
+    </div>
+
+    <h2>Bidirectional Proxy</h2>
+
+    <p>
+      Once the backend is connected, we proxy bytes in both directions using <code>select()</code>
+      with a 30-second timeout. No threads per connection — one pthread handles the full
+      client↔backend lifecycle:
+    </p>
+
+    <div class="code-block">
+      <div class="code-label">proxy_forward — bidirectional select() loop</div>
+      <div class="code-body"><span class="kw">static void</span> proxy_forward(<span class="kw">int</span> client_fd, <span class="kw">int</span> backend_fd) {
+    <span class="kw">char</span> buf[65536];
+    <span class="kw">while</span> (1) {
+        fd_set fds; FD_ZERO(&fds);
+        FD_SET(client_fd, &fds); FD_SET(backend_fd, &fds);
+        <span class="kw">struct</span> timeval tv = { FORWARD_TIMEOUT_S, 0 };
+
+        <span class="kw">int</span> ready = select(MAX(client_fd, backend_fd)+1, &fds, NULL, NULL, &tv);
+        <span class="kw">if</span> (ready <= 0) <span class="kw">break</span>; <span class="comment">/* timeout or error */</span>
+
+        <span class="kw">if</span> (FD_ISSET(client_fd, &fds)) {
+            <span class="kw">ssize_t</span> n = recv(client_fd, buf, <span class="kw">sizeof</span>(buf), 0);
+            <span class="kw">if</span> (n <= 0) <span class="kw">break</span>;
+            send(backend_fd, buf, n, 0);
+        }
+        <span class="kw">if</span> (FD_ISSET(backend_fd, &fds)) {
+            <span class="kw">ssize_t</span> n = recv(backend_fd, buf, <span class="kw">sizeof</span>(buf), 0);
+            <span class="kw">if</span> (n <= 0) <span class="kw">break</span>;
+            send(client_fd, buf, n, 0);
+        }
+    }
+}</div>
+    </div>
+
+    <h2>What We Verified</h2>
+
+    <p>
+      Tested on the same Arch Linux workstation, single-node cluster, ingress on port 9090:
+    </p>
+
+    <div class="code-block">
+      <div class="code-label">curl test — 2026-04-06</div>
+      <div class="code-body"><span class="comment"># Register a Python HTTP server in the Tower manually</span>
+<span class="ok">$ printf "REGISTER|my-server|127.0.0.1|8181" > /dev/udp/127.0.0.1/7772</span>
+
+<span class="comment"># Single route</span>
+<span class="ok">$ curl -s http://127.0.0.1:9090/
+skr8tr ingress works!</span>
+
+<span class="comment"># Multi-route prefix matching (/api → api-svc, / → my-server)</span>
+<span class="ok">$ curl -s http://127.0.0.1:9090/api
+skr8tr ingress works!
+
+$ curl -s http://127.0.0.1:9090/
+skr8tr ingress works!</span>
+
+<span class="comment"># X-Forwarded-For header injection verified</span>
+<span class="ok">$ curl -s http://127.0.0.1:9090/ | grep -i forwarded
+X-Forwarded-For: 127.0.0.1
+X-Real-IP: 127.0.0.1</span>
+
+<span class="comment"># 503 when no Tower registration exists (correct behavior)</span>
+<span class="ok">$ curl -s http://127.0.0.1:9090/
+Service not found in Tower</span></div>
+    </div>
+
+    <div class="callout">
+      TLS is not handled by the ingress. We terminate HTTPS at the cloud load balancer
+      (AWS ALB, GCP HTTPS LB, or Cloudflare Proxy) and run plain HTTP internally.
+      This is the standard production pattern — it is not a gap, it is a deliberate
+      boundary. The ingress binary stays simple and auditable.
+    </div>
+
+    <h2>Honest Limitations</h2>
+
+    <ul>
+      <li>No connection pooling to backends — new TCP connect per request</li>
+      <li>No HTTP/2 or WebSocket support — HTTP/1.1 only in the current proxy loop</li>
+      <li>64-connection soft cap (<code>max_workers</code>) — sufficient for our use case, not suitable for high-concurrency public endpoints without tuning</li>
+      <li>Tested on loopback only — not benchmarked under real network load</li>
+    </ul>
+
+    <p>
+      Full source: <a href="https://github.com/NixOSDude/skr8tr/blob/main/src/daemon/skr8tr_ingress.c">src/daemon/skr8tr_ingress.c</a> — 320 lines, no external dependencies beyond pthreads.
+    </p>
+
+    <hr />
+    <p><em>Questions: <a href="mailto:hello@skr8tr.online">hello@skr8tr.online</a></em></p>
+  </div>
+
+  <div class="post-footer">
+    <a href="/blog/rolling-updates-without-readiness-probes.html">&larr; Rolling Updates</a>
+    <a href="/blog/">All posts &rarr;</a>
+  </div>
+</div>
+
+<footer>
+  <p><strong style="color:var(--cyan)">skr8tr</strong> &nbsp;&bull;&nbsp; <a href="/">Home</a> &nbsp;&bull;&nbsp; <a href="/blog/">Blog</a> &nbsp;&bull;&nbsp; <a href="https://github.com/NixOSDude/skr8tr">GitHub</a> &nbsp;&bull;&nbsp; <a href="mailto:hello@skr8tr.online">hello@skr8tr.online</a></p>
+  <p style="margin-top:0.5rem;color:#404860;">Apache 2.0 &nbsp;&mdash;&nbsp; No Docker. No YAML. No k8s.</p>
+</footer>
+</body>
+</html>

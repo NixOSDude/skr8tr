@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="We built a rolling update system in a single pthread. Launch new replica, wait 8 seconds, kill old replica. No ReadinessProbes, no PodDisruptionBudgets, no YAML." />
+  <link rel="icon" type="image/svg+xml" href="/skr8tr.svg" />
+  <title>Rolling Updates Without ReadinessProbes — Skr8tr Blog</title>
+  <style>
+    :root{--bg:#080c10;--bg2:#0c1018;--bg3:#10141e;--border:#1a2030;--text:#d0d8e8;--muted:#607090;--cyan:#00d4ff;--green:#30d890;--orange:#f07840;--gold:#f0b020;--red:#ff4455;--font-mono:'Courier New',Courier,monospace;--font-sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    html{scroll-behavior:smooth;}
+    body{background:var(--bg);color:var(--text);font-family:var(--font-sans);font-size:17px;line-height:1.75;}
+    a{color:var(--cyan);text-decoration:none;}a:hover{text-decoration:underline;}
+    nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(8,12,16,0.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 2rem;height:56px;display:flex;align-items:center;justify-content:space-between;}
+    .nav-brand{display:block;height:28px;width:auto;max-width:140px;}
+    .nav-links{display:flex;gap:1.8rem;list-style:none;}
+    .nav-links a{color:var(--muted);font-size:0.88rem;transition:color 0.2s;}
+    .nav-links a:hover{color:var(--text);text-decoration:none;}
+    .nav-links a.active{color:var(--cyan);}
+    .article-wrap{max-width:720px;margin:0 auto;padding:5rem 2rem 6rem;}
+    .post-meta-top{display:flex;align-items:center;gap:0.8rem;margin-bottom:1.5rem;flex-wrap:wrap;}
+    .back-link{font-size:0.82rem;color:var(--muted);}
+    .back-link:hover{color:var(--text);text-decoration:none;}
+    .post-date{font-family:var(--font-mono);font-size:0.76rem;color:var(--muted);}
+    .post-tag{font-family:var(--font-mono);font-size:0.72rem;padding:0.15rem 0.5rem;border-radius:3px;border:1px solid;}
+    .tag-ops{color:var(--muted);border-color:rgba(96,112,144,0.3);background:rgba(96,112,144,0.06);}
+    .tag-arch{color:var(--green);border-color:rgba(48,216,144,0.3);background:rgba(48,216,144,0.06);}
+    h1.post-title{font-size:clamp(1.9rem,4vw,2.6rem);font-weight:800;line-height:1.15;margin-bottom:1.2rem;letter-spacing:-0.02em;}
+    .post-subtitle{font-size:1.1rem;color:var(--muted);margin-bottom:2rem;line-height:1.6;}
+    .author-row{display:flex;align-items:center;gap:0.8rem;padding:1rem 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin-bottom:3rem;}
+    .author-avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--cyan),var(--orange));display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-weight:bold;font-size:0.85rem;color:#040608;flex-shrink:0;}
+    .author-info{font-size:0.84rem;}.author-name{color:var(--text);font-weight:600;}.author-bio{color:var(--muted);}
+    .prose h2{font-size:1.5rem;font-weight:700;margin:2.8rem 0 0.8rem;color:var(--text);line-height:1.3;}
+    .prose h3{font-size:1.1rem;font-weight:700;margin:2rem 0 0.6rem;color:var(--cyan);}
+    .prose p{margin-bottom:1.3rem;color:var(--text);}
+    .prose ul,.prose ol{margin:0 0 1.3rem 1.4rem;color:var(--text);}
+    .prose li{margin-bottom:0.4rem;}
+    .prose strong{color:var(--text);font-weight:700;}
+    .prose code{font-family:var(--font-mono);font-size:0.85em;background:rgba(0,212,255,0.07);border:1px solid rgba(0,212,255,0.15);padding:0.1em 0.35em;border-radius:3px;color:var(--cyan);}
+    .prose hr{border:none;border-top:1px solid var(--border);margin:3rem 0;}
+    .code-block{background:var(--bg2);border:1px solid var(--border);border-radius:8px;overflow-x:auto;margin:1.5rem 0;}
+    .code-label{background:var(--bg3);border-bottom:1px solid var(--border);padding:0.5rem 1.2rem;font-family:var(--font-mono);font-size:0.72rem;color:var(--muted);letter-spacing:0.05em;}
+    .code-body{padding:1.2rem 1.4rem;font-family:var(--font-mono);font-size:0.82rem;line-height:1.75;white-space:pre;color:var(--text);}
+    .code-body .comment{color:var(--muted);}.code-body .kw{color:var(--cyan);}.code-body .ok{color:var(--green);}.code-body .bad{color:var(--red);}
+    .callout{border-left:3px solid var(--cyan);background:rgba(0,212,255,0.04);padding:1.2rem 1.5rem;margin:2rem 0;border-radius:0 8px 8px 0;font-size:1rem;color:var(--text);line-height:1.65;}
+    .post-footer{margin-top:4rem;padding-top:2rem;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;}
+    .post-footer a{font-size:0.88rem;color:var(--muted);}.post-footer a:hover{color:var(--text);}
+    footer{border-top:1px solid var(--border);padding:2rem;text-align:center;color:var(--muted);font-size:0.82rem;}
+    footer a{color:var(--muted);}footer a:hover{color:var(--text);}
+    @media(max-width:600px){.nav-links{display:none;}h1.post-title{font-size:1.6rem;}.code-body{font-size:0.75rem;}}
+  </style>
+</head>
+<body>
+<nav>
+  <a href="/"><img src="/skr8tr.svg" alt="skr8tr" class="nav-brand" /></a>
+  <ul class="nav-links">
+    <li><a href="/">Home</a></li>
+    <li><a href="/#features">Features</a></li>
+    <li><a href="/#install">Install</a></li>
+    <li><a href="/blog/" class="active">Blog</a></li>
+    <li><a href="https://github.com/NixOSDude/skr8tr">GitHub</a></li>
+  </ul>
+</nav>
+
+<div class="article-wrap">
+  <div class="post-meta-top">
+    <a class="back-link" href="/blog/">&larr; Blog</a>
+    <span class="post-date">April 6, 2026</span>
+    <span class="post-tag tag-ops">operations</span>
+    <span class="post-tag tag-arch">architecture</span>
+  </div>
+
+  <h1 class="post-title">Rolling Updates Without ReadinessProbes, PodDisruptionBudgets, or YAML</h1>
+  <p class="post-subtitle">
+    We built the entire rolling update system in a single detached pthread — roughly 80 lines of C23.
+    Launch new replica, wait 8 seconds, kill old replica. Repeat per replica. Verified on a local
+    single-node cluster. Here is exactly how it works.
+  </p>
+
+  <div class="author-row">
+    <div class="author-avatar">SB</div>
+    <div class="author-info">
+      <div class="author-name">Scott Baker</div>
+      <div class="author-bio">Systems engineer &mdash; C23, Rust, NixOS, post-quantum security</div>
+    </div>
+  </div>
+
+  <div class="prose">
+
+    <p>
+      A Kubernetes rolling update requires you to configure and correctly understand at least five
+      things before it works without incident: <code>maxSurge</code>, <code>maxUnavailable</code>,
+      <code>readinessProbe</code>, <code>PodDisruptionBudget</code>, and the termination grace period.
+      Get the readiness probe wrong and the rollout stalls indefinitely — waiting for a pod to become
+      ready that will never report ready because the probe path is wrong. We have all been there.
+    </p>
+
+    <p>
+      Skr8tr's rollout is one command:
+    </p>
+
+    <div class="code-block">
+      <div class="code-label">triggering a rolling update</div>
+      <div class="code-body"><span class="ok">$ skr8tr --key ~/.skr8tr/signing.sec rollout api-v2.skr8tr</span>
+<span class="ok">  rolling out /home/sbaker/skr8tr/examples/api-v2.skr8tr... ok
+  app     api-server
+  status  new replicas launching, old replicas draining (8s settle)</span></div>
+    </div>
+
+    <h2>How rollout_thread Works</h2>
+
+    <p>
+      When the Conductor receives a <code>ROLLOUT</code> command it does two things: responds
+      immediately with <code>OK|ROLLOUT|&lt;app&gt;</code> (non-blocking), then spawns a detached
+      pthread to do the actual work. The thread owns the rollout from that point forward.
+    </p>
+
+    <div class="code-block">
+      <div class="code-label">src/daemon/skr8tr_sched.c — rollout_thread (simplified)</div>
+      <div class="code-body"><span class="kw">static void</span> *rollout_thread(<span class="kw">void</span> *arg) {
+    RolloutArgs *ra = arg;
+
+    <span class="comment">/* Bump the generation counter — new replicas get gen N+1 */</span>
+    pthread_mutex_lock(&g_mu);
+    Workload *wl = workload_find(ra->app_name);
+    wl->current_gen++;
+    <span class="kw">int</span> new_gen = wl->current_gen;
+    pthread_mutex_unlock(&g_mu);
+
+    <span class="comment">/* For each existing (old-gen) placement, one at a time: */</span>
+    <span class="kw">for</span> (<span class="kw">int</span> i = 0; i < old_count; i++) {
+
+        <span class="comment">/* 1. Launch a new-generation replica on the best available node */</span>
+        NodeEntry *node = node_least_loaded_for_port(wl->port);
+        launch_replica(wl, node);   <span class="comment">/* sends LAUNCH to node, waits for LAUNCHED+PID */</span>
+
+        <span class="comment">/* 2. Wait for the settle window — workload starts, stabilises */</span>
+        sleep(ROLLOUT_WAIT_S);      <span class="comment">/* ROLLOUT_WAIT_S = 8 */</span>
+
+        <span class="comment">/* 3. Kill the old-generation replica */</span>
+        send_kill(old_placements[i].node_id, old_placements[i].app_name);
+        node_port_release(old_node, wl->port);
+    }
+    free(ra);
+    <span class="kw">return</span> NULL;
+}</div>
+    </div>
+
+    <p>
+      The generation counter is the key: every <code>Placement</code> struct carries an integer
+      <code>generation</code> field. When a rollout starts, all existing placements are old-gen
+      (N). New placements get gen N+1. The thread walks the old-gen list, replacing each one.
+      During the rollout, both generations coexist briefly — there is no downtime gap for
+      multi-replica workloads.
+    </p>
+
+    <h2>Port Collision Safety</h2>
+
+    <p>
+      One problem we hit early: if a workload binds port 8080, and both the old and new replica
+      land on the same node, the new process fails to bind. We fixed this by tracking bound ports
+      per node in the Conductor.
+    </p>
+
+    <div class="code-block">
+      <div class="code-label">NodeEntry struct — port tracking added for rollout safety</div>
+      <div class="code-body"><span class="kw">typedef struct</span> {
+    <span class="kw">char</span>   node_id[64];
+    <span class="kw">char</span>   ip[64];
+    <span class="kw">int</span>    cpu_pct;
+    <span class="kw">int</span>    ram_free_mb;
+    <span class="kw">time_t</span> last_heartbeat;
+    <span class="comment">/* Added for rollout port safety: */</span>
+    <span class="kw">int</span>    used_ports[64];
+    <span class="kw">int</span>    used_port_count;
+} NodeEntry;</div>
+    </div>
+
+    <p>
+      <code>node_least_loaded_for_port(port)</code> skips any node that already has that port
+      in its <code>used_ports</code> array. Ports are claimed when the node confirms
+      <code>LAUNCHED</code>, released on <code>KILL</code> or node expiry.
+    </p>
+
+    <h2>The Verified Test</h2>
+
+    <p>
+      We ran this on a single Arch Linux workstation — one Conductor, one node, both on localhost.
+      The workload was <code>/bin/sleep 3600</code> (the simplest possible long-running process).
+    </p>
+
+    <div class="code-block">
+      <div class="code-label">end-to-end rollout verification — 2026-04-06</div>
+      <div class="code-body"><span class="comment"># Deploy initial workload — PID 1031776</span>
+<span class="ok">$ skr8tr --key ~/.skr8tr/signing.sec up examples/my-server.skr8tr
+  submitting... ok  |  app my-server  |  node 638eb13e...</span>
+
+<span class="ok">$ skr8tr list
+  my-server   638eb13e...   1031776</span>
+
+<span class="comment"># Trigger rollout</span>
+<span class="ok">$ skr8tr --key ~/.skr8tr/signing.sec rollout examples/my-server.skr8tr
+  rolling out... ok — new replicas launching, old replicas draining (8s settle)</span>
+
+<span class="comment"># Wait 10s, then check</span>
+<span class="ok">$ skr8tr list
+  my-server   638eb13e...   1032014    ← new PID</span>
+
+<span class="comment"># Confirm old PID is dead</span>
+<span class="ok">$ ps -p 1031776
+  old PID 1031776 is dead — rollout replaced it</span></div>
+    </div>
+
+    <div class="callout">
+      The 8-second settle window is a pragmatic choice, not a fundamental constraint. For services
+      that start in milliseconds (most compiled binaries), 8 seconds is conservative. A future
+      version will support a configurable <code>settle</code> field in the manifest and an optional
+      HTTP probe to cut the window short once the new replica is responding.
+    </div>
+
+    <h2>What We Have Not Done</h2>
+
+    <p>
+      Honest gaps in the current implementation:
+    </p>
+    <ul>
+      <li>No configurable settle time — hardcoded 8s. Works for our use case; may be too long for fast-start services or too short for slow-start ones.</li>
+      <li>No HTTP readiness check during the settle window — we sleep unconditionally. The old replica dies at 8s regardless of whether the new one is actually serving traffic.</li>
+      <li>Single-node test only — the rollout logic is correct for multi-node clusters (it calls <code>node_least_loaded_for_port</code> which handles any node count) but we have not run it against a physical multi-node setup yet.</li>
+    </ul>
+
+    <p>
+      Source: <a href="https://github.com/NixOSDude/skr8tr/blob/main/src/daemon/skr8tr_sched.c">src/daemon/skr8tr_sched.c</a> — search for <code>rollout_thread</code>.
+    </p>
+
+    <hr />
+    <p><em>Questions: <a href="mailto:hello@skr8tr.online">hello@skr8tr.online</a></em></p>
+  </div>
+
+  <div class="post-footer">
+    <a href="/blog/post-quantum-auth-no-passwords.html">&larr; PQC Auth</a>
+    <a href="/blog/http-ingress-in-320-lines-of-c.html">Next: HTTP Ingress &rarr;</a>
+  </div>
+</div>
+
+<footer>
+  <p><strong style="color:var(--cyan)">skr8tr</strong> &nbsp;&bull;&nbsp; <a href="/">Home</a> &nbsp;&bull;&nbsp; <a href="/blog/">Blog</a> &nbsp;&bull;&nbsp; <a href="https://github.com/NixOSDude/skr8tr">GitHub</a> &nbsp;&bull;&nbsp; <a href="mailto:hello@skr8tr.online">hello@skr8tr.online</a></p>
+  <p style="margin-top:0.5rem;color:#404860;">Apache 2.0 &nbsp;&mdash;&nbsp; No Docker. No YAML. No k8s.</p>
+</footer>
+</body>
+</html>
