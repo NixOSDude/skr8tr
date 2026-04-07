@@ -70,8 +70,13 @@ $(BIN)/skr8tr_reg: $(SRC)/daemon/skr8tr_reg.c $(SRC)/core/fabric.c
 $(BIN)/skr8tr_serve: $(SRC)/server/skr8tr_serve.c
 	$(CC) $(CFLAGS) $^ -o $@ -lpthread
 
+INGRESS_LDFLAGS = -lpthread -lssl -lcrypto
+ifdef ENTERPRISE
+  INGRESS_LDFLAGS += -lnghttp2
+endif
+
 $(BIN)/skr8tr_ingress: $(SRC)/daemon/skr8tr_ingress.c $(SRC)/core/fabric.c
-	$(CC) $(CFLAGS) $^ -o $@ -lpthread -lssl -lcrypto
+	$(CC) $(CFLAGS) $^ -o $@ $(INGRESS_LDFLAGS)
 
 $(BIN)/skrtrkey: $(SRC)/tools/skrtrkey.c $(SRC)/core/skrauth.c
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
