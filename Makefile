@@ -3,7 +3,14 @@
 
 CC      = gcc
 # gnu23: C23 + POSIX extensions (nanosleep, putenv, kill, etc.)
-CFLAGS  = -O3 -Wall -Wextra -std=gnu23 -I./src/core
+# Set ENTERPRISE=1 to build with private enterprise features (audit, syslog, RBAC)
+# Private Gitea builds use: make ENTERPRISE=1
+# Public open-source builds: make  (no flag)
+ENTERPRISE_FLAGS =
+ifdef ENTERPRISE
+  ENTERPRISE_FLAGS = -DENTERPRISE -I./src/enterprise
+endif
+CFLAGS  = -O3 -Wall -Wextra -std=gnu23 -I./src/core $(ENTERPRISE_FLAGS)
 LDFLAGS = -lpthread -loqs
 
 OQS_INC ?= $(shell pkg-config --variable=includedir liboqs 2>/dev/null)
@@ -41,10 +48,14 @@ $(BIN)/skr8tr_node: $(SRC)/daemon/skr8tr_node.c $(SRC)/core/fabric.c \
                     $(SRC)/parser/skrmaker.c
 	$(CC) $(CFLAGS) -I./src/parser $^ -o $@ $(LDFLAGS)
 
-$(BIN)/skr8tr_sched: $(SRC)/daemon/skr8tr_sched.c $(SRC)/core/fabric.c \
-                    $(SRC)/core/skrauth.c $(SRC)/core/skr8tr_audit.c \
-                    $(SRC)/core/skr8tr_syslog.c \
-                    $(SRC)/parser/skrmaker.c
+SCHED_SRCS = $(SRC)/daemon/skr8tr_sched.c $(SRC)/core/fabric.c \
+             $(SRC)/core/skrauth.c $(SRC)/parser/skrmaker.c
+ifdef ENTERPRISE
+  SCHED_SRCS += $(SRC)/enterprise/skr8tr_audit.c \
+                $(SRC)/enterprise/skr8tr_syslog.c
+endif
+
+$(BIN)/skr8tr_sched: $(SCHED_SRCS)
 	$(CC) $(CFLAGS) -I./src/parser $^ -o $@ $(LDFLAGS) -lssl -lcrypto
 
 $(BIN)/skr8tr_reg: $(SRC)/daemon/skr8tr_reg.c $(SRC)/core/fabric.c

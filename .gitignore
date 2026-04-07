@@ -14,3 +14,6 @@ SESSION_STATE.md
 
 # Root-level logo source (web copy lives in docs/)
 skr8tr.svg
+
+# Enterprise features — excluded from GitHub pushes via separate .gitignore
+# src/enterprise/ is tracked on Gitea (private) but excluded from GitHub

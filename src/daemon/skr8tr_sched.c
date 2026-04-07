@@ -35,9 +35,12 @@
 
 #include "../core/fabric.h"
 #include "../core/skrauth.h"
-#include "../core/skr8tr_audit.h"
-#include "../core/skr8tr_syslog.h"
 #include "../parser/skrmaker.h"
+
+#ifdef ENTERPRISE
+#include "../enterprise/skr8tr_audit.h"
+#include "../enterprise/skr8tr_syslog.h"
+#endif
 
 #include <arpa/inet.h>
 #include <errno.h>
@@ -890,8 +893,10 @@ static void handle_command(const char* cmd, const FabricAddr* src,
                         "[sched] UNAUTHORIZED command from %s — "
                         "sign with: skr8tr --key ~/.skr8tr/signing.sec\n",
                         src->ip);
+#ifdef ENTERPRISE
                 skraudit_log(SKRAUDIT_AUTH_FAIL, "", src->ip,
                              "bad or missing ML-DSA-65 signature");
+#endif
                 snprintf(resp, resp_len,
                          "ERR|UNAUTHORIZED — sign commands with: "
                          "skr8tr --key ~/.skr8tr/signing.sec");
@@ -902,22 +907,28 @@ static void handle_command(const char* cmd, const FabricAddr* src,
     }
 
     if (!strncmp(effective_cmd, "SUBMIT|", 7)) {
+#ifdef ENTERPRISE
         skraudit_log(SKRAUDIT_SUBMIT, effective_cmd + 7, src->ip,
                      "workload submitted");
+#endif
         submit_workload(effective_cmd + 7, resp, resp_len);
         return;
     }
 
     if (!strncmp(effective_cmd, "EVICT|", 6)) {
+#ifdef ENTERPRISE
         skraudit_log(SKRAUDIT_EVICT, effective_cmd + 6, src->ip,
                      "workload evicted");
+#endif
         evict_workload(effective_cmd + 6, resp, resp_len);
         return;
     }
 
     if (!strncmp(effective_cmd, "ROLLOUT|", 8)) {
+#ifdef ENTERPRISE
         skraudit_log(SKRAUDIT_ROLLOUT, effective_cmd + 8, src->ip,
                      "rolling update initiated");
+#endif
         rollout_workload(effective_cmd + 8, resp, resp_len);
         return;
     }
@@ -1014,7 +1025,9 @@ static void handle_command(const char* cmd, const FabricAddr* src,
             return;
         }
 
+#ifdef ENTERPRISE
         skraudit_log(SKRAUDIT_EXEC, app_name, src->ip, shell_cmd);
+#endif
 
         /* Forward EXEC to node CMD port and relay response */
         int esock = fabric_bind(0);
@@ -1127,6 +1140,7 @@ static void handle_command(const char* cmd, const FabricAddr* src,
         return;
     }
 
+#ifdef ENTERPRISE
     /* ---------------------------------------------------------------
      * AUDIT|<n>
      * Return the last n entries from the cryptographic audit ledger.
@@ -1157,6 +1171,7 @@ static void handle_command(const char* cmd, const FabricAddr* src,
             snprintf(resp, resp_len, "ERR|AUDIT_VERIFY|%s", verify_err);
         return;
     }
+#endif /* ENTERPRISE */
 
     snprintf(resp, resp_len, "ERR|unknown command");
     (void)src;
@@ -1194,8 +1209,10 @@ static void process_heartbeat(const char* msg, const FabricAddr* src) {
         char node_id[33] = {0}, app_name[128] = {0};
         sscanf(msg, "DIED|%32[^|]|%127[^|]", node_id, app_name);
         printf("[sched] DIED: %s on node %s\n", app_name, node_id);
+#ifdef ENTERPRISE
         skraudit_log(SKRAUDIT_NODE_DIED, app_name, node_id,
                      "process exited — rebalancer will relaunch");
+#endif
 
         pthread_mutex_lock(&g_workloads_mu);
         for (int w = 0; w < MAX_WORKLOADS; w++) {
@@ -1254,33 +1271,34 @@ static void process_heartbeat(const char* msg, const FabricAddr* src) {
 int main(int argc, char* argv[]) {
     /* Parse flags:
      *   --pubkey     <path>   ML-DSA-65 public key for command authentication
-     *   --audit-log  <path>   override default audit log path
-     *   --audit-key  <path>   32-byte key file for AES-256-GCM at-rest encryption
-     *   --syslog-host <host>  syslog collector hostname/IP (UDP RFC 5426)
-     *   --syslog-port <port>  syslog collector port (default 514 / 6514 for TLS)
-     *   --syslog-tls          use TLS/TCP syslog (RFC 5425) instead of UDP
-     *   --syslog-ca  <path>   PEM CA cert for TLS peer verification
      */
+#ifdef ENTERPRISE
     const char* audit_path    = NULL;
     const char* audit_key     = NULL;
     const char* syslog_host   = NULL;
     int         syslog_port   = 0;
     int         syslog_tls    = 0;
     const char* syslog_ca     = NULL;
+#endif
 
     for (int i = 1; i < argc; i++) {
         if (i < argc - 1) {
             if (!strcmp(argv[i], "--pubkey"))
                 snprintf(g_pubkey_path, sizeof(g_pubkey_path), "%s", argv[i + 1]);
+#ifdef ENTERPRISE
             if (!strcmp(argv[i], "--audit-log"))  audit_path  = argv[i + 1];
             if (!strcmp(argv[i], "--audit-key"))  audit_key   = argv[i + 1];
             if (!strcmp(argv[i], "--syslog-host")) syslog_host = argv[i + 1];
             if (!strcmp(argv[i], "--syslog-port")) syslog_port = atoi(argv[i + 1]);
             if (!strcmp(argv[i], "--syslog-ca"))  syslog_ca   = argv[i + 1];
+#endif
         }
+#ifdef ENTERPRISE
         if (!strcmp(argv[i], "--syslog-tls")) syslog_tls = 1;
+#endif
     }
 
+#ifdef ENTERPRISE
     /* Enable at-rest encryption BEFORE init so the genesis entry is encrypted */
     if (audit_key)
         skraudit_set_encryption(audit_key);
@@ -1296,6 +1314,7 @@ int main(int argc, char* argv[]) {
             fprintf(stderr, "[sched] WARNING: syslog init failed — "
                     "events will not be forwarded to SIEM\n");
     }
+#endif
 
     printf("[sched] Skr8tr Conductor starting...\n");
 
