@@ -441,3 +441,68 @@ released on KILL/EVICT, cleared on node expiry.
 
 ### Next Milestone
 Phase 16: TLS termination in skr8tr_ingress (self-signed or ACME) — optional upgrade
+
+---
+
+## [2026-04-06] main — Phase 1 Production-Ready Features Complete
+
+### Commits
+- 445ec0a Phase 1: HTTP readiness probe in rollout, cgroups v2 limits, TLS ingress
+- 02e671f Phase 1: Centralized log aggregation via Conductor + secret manifest block
+
+### What Was Built
+
+**1. HTTP Readiness Probe in Rollout (`skr8tr_sched.c`)**
+- `remote_health_probe()` — TCP connect from Conductor to new replica's HTTP endpoint
+- `rollout_thread` now polls `health.check` endpoint with configurable timeout
+- `health.interval` drives the max settle window (e.g. "30s" → poll for 30s max)
+- Falls back to `ROLLOUT_WAIT_S=8` when no health check is declared
+- Captures `new_node_ip` before mutex unlock — no dangling pointer on probe
+
+**2. cgroups v2 Resource Limits (`skr8tr_node.c`)**
+- `cgroup_apply()` creates `/sys/fs/cgroup/skr8tr/<name>/`, writes PID, sets `memory.max` and `cpu.max`
+- Called from `launch_proc()` after fork — applies `ram` and `cpu` manifest fields
+- Gracefully no-ops when cgroups v2 not mounted
+
+**3. TLS Termination (`skr8tr_ingress.c`)**
+- OpenSSL (`libssl`, `libcrypto`) linked via Makefile
+- `--tls-cert <pem>` and `--tls-key <pem>` flags enable HTTPS
+- SSL_CTX initialized once at startup; SSL_accept per connection before thread spawn
+- `client_read()` / `client_write()` wrappers — backend always plain HTTP
+- `proxy_forward(fd, backend_fd, ssl)` handles TLS↔plaintext asymmetry
+- Disabled by default — plain HTTP mode unchanged
+
+**4. Centralized Log Aggregation (`skr8tr_sched.c`)**
+- `LOGS|<app_name>` command on Conductor port 7771
+- Finds all nodes hosting app replicas, fans out `LOGS|<name>` queries
+- Aggregates ring buffer output per node, returns in single response
+- CLI can now send one command to Conductor instead of querying every node
+
+**5. Secret Manifest Block (`skrmaker.h`, `skrmaker.c`, `skr8tr_node.c`)**
+- `secret {}` block in `.skr8tr` — same syntax as `env {}`
+- `SkrtrSecret` struct in `SkrProc` — 32 secrets per app
+- Secrets injected post-fork via `putenv()` — never sent in LAUNCH UDP command
+- Never logged — invisible to Conductor, Tower, and node logs
+
+### Build Status
+- `make` → zero warnings, all binaries updated
+- `bin/skr8tr_ingress --help` confirms TLS flags present
+
+### skr8tr vs k8s — Updated Gap Analysis
+
+| Feature | Kubernetes | Skr8tr |
+|---------|-----------|--------|
+| Rolling update safety | ReadinessProbe + PDB | HTTP readiness polling ✅ |
+| Resource limits | Requests/Limits via cgroups | cgroups v2 `memory.max` + `cpu.max` ✅ |
+| TLS termination | cert-manager + Let's Encrypt | `--tls-cert` / `--tls-key` ✅ |
+| Secret management | etcd-encrypted Secrets | `secret {}` block, post-fork inject ✅ |
+| Log aggregation | kubectl logs --selector | `LOGS|<app>` via Conductor ✅ |
+
+### Remaining Phase 1 Gap
+- HTTP/2 support (ingress — requires ALPN negotiation with TLS)
+- Persistent volume claims (Phase 2)
+- Prometheus metrics endpoint (Phase 2)
+
+### Next Milestone
+Phase 2: `skr8tr exec <app> <cmd>` — remote shell into running replica  
+OR: HTTP/2 + ALPN in ingress (h2 over TLS — nghttp2 or custom frame parser)
