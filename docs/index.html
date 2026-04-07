@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Skr8tr — The sovereign workload orchestrator. Run microservices on bare metal or cloud clusters. No Docker. No YAML. No Kubernetes. 5MB control plane." />
+  <meta property="og:title" content="Skr8tr — The k8s Killer" />
+  <meta property="og:description" content="Sovereign workload orchestration. No Docker. No YAML. No Kubernetes. PQC-signed commands. 5MB control plane." />
+  <meta property="og:type" content="website" />
+  <title>Skr8tr — The Sovereign Orchestrator</title>
+  <style>
+    :root {
+      --bg:        #080c10;
+      --bg2:       #0c1018;
+      --bg3:       #10141e;
+      --border:    #1a2030;
+      --text:      #d0d8e8;
+      --muted:     #607090;
+      --cyan:      #00d4ff;
+      --green:     #30d890;
+      --orange:    #f07840;
+      --gold:      #f0b020;
+      --red:       #ff4455;
+      --font-mono: 'Courier New', Courier, monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      font-size: 16px;
+      line-height: 1.7;
+    }
+    a { color: var(--cyan); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(8, 12, 16, 0.94);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      height: 56px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-brand {
+      font-family: var(--font-mono);
+      font-size: 1.1rem;
+      font-weight: bold;
+      color: var(--cyan);
+      letter-spacing: 0.08em;
+    }
+    .nav-brand span { color: var(--orange); }
+    .nav-links { display: flex; gap: 1.8rem; list-style: none; }
+    .nav-links a { color: var(--muted); font-size: 0.88rem; transition: color 0.2s; }
+    .nav-links a:hover { color: var(--text); text-decoration: none; }
+
+    /* ── HERO ── */
+    .hero {
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center;
+      padding: 6rem 2rem 4rem;
+    }
+    .hero-badge {
+      display: inline-block;
+      background: rgba(0, 212, 255, 0.08);
+      border: 1px solid rgba(0, 212, 255, 0.25);
+      color: var(--cyan);
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      padding: 0.3rem 0.9rem;
+      border-radius: 2rem;
+      margin-bottom: 2.2rem;
+      letter-spacing: 0.1em;
+    }
+    .hero h1 {
+      font-size: clamp(2.8rem, 7vw, 5rem);
+      font-weight: 800;
+      line-height: 1.1;
+      margin-bottom: 0.5rem;
+      letter-spacing: -0.02em;
+    }
+    .hero h1 .sk { color: var(--cyan); }
+    .hero h1 .r8 { color: var(--orange); }
+    .hero-tagline {
+      font-size: clamp(1.1rem, 2.5vw, 1.5rem);
+      color: var(--muted);
+      margin-bottom: 2.5rem;
+      max-width: 600px;
+    }
+    .hero-tagline strong { color: var(--text); }
+    .hero-actions { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; margin-bottom: 4rem; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      padding: 0.75rem 1.8rem;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+    .btn-primary {
+      background: var(--cyan);
+      color: #040608;
+    }
+    .btn-primary:hover { background: #33ddff; text-decoration: none; }
+    .btn-secondary {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { border-color: var(--muted); text-decoration: none; }
+
+    /* Terminal demo */
+    .terminal {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      max-width: 700px;
+      width: 100%;
+      text-align: left;
+      overflow: hidden;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+    }
+    .term-bar {
+      background: var(--bg3);
+      padding: 0.6rem 1rem;
+      display: flex; align-items: center; gap: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .term-dot { width: 12px; height: 12px; border-radius: 50%; }
+    .term-dot.r { background: #ff5f56; }
+    .term-dot.y { background: #ffbd2e; }
+    .term-dot.g { background: #27c93f; }
+    .term-title { margin-left: auto; color: var(--muted); font-size: 0.78rem; font-family: var(--font-mono); }
+    .term-body {
+      padding: 1.4rem 1.6rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      line-height: 1.8;
+    }
+    .term-body .prompt { color: var(--green); }
+    .term-body .cmd    { color: var(--text); }
+    .term-body .out    { color: var(--muted); }
+    .term-body .ok     { color: var(--green); }
+    .term-body .err    { color: var(--red); }
+    .term-body .hi     { color: var(--cyan); }
+
+    /* ── SECTION ── */
+    section { padding: 5rem 2rem; max-width: 1100px; margin: 0 auto; }
+    .section-label {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--orange);
+      letter-spacing: 0.15em;
+      margin-bottom: 0.8rem;
+    }
+    h2 {
+      font-size: clamp(1.8rem, 4vw, 2.6rem);
+      font-weight: 700;
+      line-height: 1.2;
+      margin-bottom: 1rem;
+    }
+    .section-sub {
+      color: var(--muted);
+      font-size: 1.05rem;
+      max-width: 680px;
+      margin-bottom: 3rem;
+    }
+
+    /* ── COMPARISON ── */
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+    @media (max-width: 700px) { .comparison { grid-template-columns: 1fr; } }
+    .comp-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.8rem;
+    }
+    .comp-card.them { border-color: rgba(255, 68, 85, 0.25); }
+    .comp-card.us   { border-color: rgba(0, 212, 255, 0.25); }
+    .comp-card h3 { font-size: 1rem; margin-bottom: 1.2rem; color: var(--muted); font-weight: 600; }
+    .comp-card.them h3 { color: var(--red); }
+    .comp-card.us h3   { color: var(--cyan); }
+    .comp-row { display: flex; align-items: flex-start; gap: 0.7rem; margin-bottom: 0.6rem; font-size: 0.9rem; }
+    .comp-icon { flex-shrink: 0; margin-top: 0.2rem; font-size: 0.85rem; }
+
+    /* ── FEATURES GRID ── */
+    .feat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.2rem;
+    }
+    .feat-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.6rem;
+      transition: border-color 0.2s;
+    }
+    .feat-card:hover { border-color: var(--muted); }
+    .feat-icon { font-size: 1.6rem; margin-bottom: 0.8rem; }
+    .feat-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--text); }
+    .feat-card p  { font-size: 0.88rem; color: var(--muted); line-height: 1.6; }
+
+    /* ── ARCHITECTURE ── */
+    .arch-diagram {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 2rem;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--muted);
+      overflow-x: auto;
+      white-space: pre;
+      line-height: 1.7;
+    }
+    .arch-diagram .hi   { color: var(--cyan); }
+    .arch-diagram .grn  { color: var(--green); }
+    .arch-diagram .org  { color: var(--orange); }
+
+    /* ── CODE BLOCK ── */
+    .code-block {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.4rem 1.6rem;
+      font-family: var(--font-mono);
+      font-size: 0.84rem;
+      color: var(--text);
+      overflow-x: auto;
+      line-height: 1.8;
+    }
+    .code-block .comment { color: var(--muted); }
+    .code-block .kw      { color: var(--cyan); }
+    .code-block .val     { color: var(--orange); }
+    .code-block .str     { color: var(--green); }
+
+    /* ── STAT ROW ── */
+    .stat-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 1.2rem;
+      margin: 3rem 0;
+    }
+    .stat-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.4rem;
+      text-align: center;
+    }
+    .stat-num { font-size: 2rem; font-weight: 800; color: var(--cyan); font-family: var(--font-mono); }
+    .stat-label { font-size: 0.82rem; color: var(--muted); margin-top: 0.3rem; }
+
+    /* ── INSTALL ── */
+    .install-steps { display: flex; flex-direction: column; gap: 1.2rem; }
+    .install-step {
+      display: flex; align-items: flex-start; gap: 1.2rem;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.4rem 1.6rem;
+    }
+    .step-num {
+      flex-shrink: 0;
+      width: 28px; height: 28px;
+      background: rgba(0,212,255,0.12);
+      border: 1px solid rgba(0,212,255,0.3);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--cyan);
+      margin-top: 0.2rem;
+    }
+    .step-body h4 { font-size: 0.95rem; margin-bottom: 0.4rem; color: var(--text); }
+    .step-body code {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--green);
+      background: rgba(0,0,0,0.3);
+      padding: 0.15rem 0.4rem;
+      border-radius: 3px;
+    }
+    .step-body p { font-size: 0.88rem; color: var(--muted); }
+
+    /* ── CTA ── */
+    .cta-section {
+      text-align: center;
+      padding: 5rem 2rem;
+      border-top: 1px solid var(--border);
+    }
+    .cta-section h2 { margin-bottom: 1rem; }
+    .cta-section p  { color: var(--muted); max-width: 520px; margin: 0 auto 2.5rem; }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2rem;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+    footer a { color: var(--muted); }
+    footer a:hover { color: var(--text); }
+
+    /* ── DIVIDER ── */
+    .divider { border: none; border-top: 1px solid var(--border); margin: 0; }
+
+    @media (max-width: 600px) {
+      .nav-links { display: none; }
+      .hero h1 { font-size: 2.4rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-brand"><span>sk</span>r8<span>tr</span></div>
+  <ul class="nav-links">
+    <li><a href="#why">Why</a></li>
+    <li><a href="#features">Features</a></li>
+    <li><a href="#install">Install</a></li>
+    <li><a href="#manifest">Manifests</a></li>
+    <li><a href="#arch">Architecture</a></li>
+    <li><a href="https://github.com/NixOSDude/skr8tr">GitHub</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-badge">&#x26A1; OPEN SOURCE &nbsp;&bull;&nbsp; C23 + RUST &nbsp;&bull;&nbsp; POST-QUANTUM AUTH</div>
+  <h1><span class="sk">sk</span>r<span class="r8">8</span>tr</h1>
+  <p class="hero-tagline">
+    The <strong>sovereign workload orchestrator.</strong><br>
+    No Docker. No YAML. No Kubernetes.<br>
+    5 MB control plane. PQC-signed commands.
+  </p>
+  <div class="hero-actions">
+    <a class="btn btn-primary" href="#install">Get Started</a>
+    <a class="btn btn-secondary" href="https://github.com/NixOSDude/skr8tr">View on GitHub &rarr;</a>
+  </div>
+
+  <!-- Terminal demo -->
+  <div class="terminal">
+    <div class="term-bar">
+      <div class="term-dot r"></div>
+      <div class="term-dot y"></div>
+      <div class="term-dot g"></div>
+      <div class="term-title">skr8tr — sovereign orchestrator</div>
+    </div>
+    <div class="term-body">
+      <div><span class="prompt">$</span> <span class="cmd">skr8tr --key ~/.skr8tr/signing.sec up api.skr8tr</span></div>
+      <div><span class="out">&nbsp; submitting /opt/apps/api.skr8tr... </span><span class="ok">ok</span></div>
+      <div><span class="out">&nbsp; app&nbsp;&nbsp;&nbsp; api-server</span></div>
+      <div><span class="out">&nbsp; node&nbsp;&nbsp; b33c8ed0ea05839d78934cb8</span></div>
+      <div>&nbsp;</div>
+      <div><span class="prompt">$</span> <span class="cmd">skr8tr nodes</span></div>
+      <div><span class="out">&nbsp; 3 live node(s)</span></div>
+      <div>&nbsp;</div>
+      <div><span class="out">&nbsp; NODE ID&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;IP&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CPU%&nbsp;&nbsp; RAM</span></div>
+      <div><span class="out">&nbsp; b33c8ed0ea05839d78934cb8dbb1c5f4&nbsp;&nbsp;10.0.0.1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3%&nbsp;&nbsp; 45GB</span></div>
+      <div><span class="out">&nbsp; a1f2c3d4e5f6789012345678abcdef01&nbsp;&nbsp;10.0.0.2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;9%&nbsp;&nbsp; 31GB</span></div>
+      <div><span class="out">&nbsp; 9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b&nbsp;&nbsp;10.0.0.3&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1%&nbsp;&nbsp; 62GB</span></div>
+      <div>&nbsp;</div>
+      <div><span class="prompt">$</span> <span class="cmd">skr8tr --key ~/.skr8tr/signing.sec rollout api-v2.skr8tr</span></div>
+      <div><span class="out">&nbsp; rolling out... </span><span class="ok">ok</span><span class="out"> — new replicas launching, old draining (8s settle)</span></div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider" />
+
+<!-- STATS -->
+<section>
+  <div class="stat-row">
+    <div class="stat-card">
+      <div class="stat-num">5 MB</div>
+      <div class="stat-label">Total control plane size</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">3</div>
+      <div class="stat-label">Binaries to run a cluster</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">~0</div>
+      <div class="stat-label">Config files required</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">ML-DSA-65</div>
+      <div class="stat-label">Post-quantum auth on every command</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">C23</div>
+      <div class="stat-label">No GC, no JVM, no runtime bloat</div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- WHY -->
+<section id="why">
+  <div class="section-label">// WHY SKR8TR</div>
+  <h2>Kubernetes is a tax on your infrastructure.</h2>
+  <p class="section-sub">
+    k8s was designed for Google's scale in 2014. Most teams don't need a 600 MB control plane,
+    etcd consensus, iptables mazes, and 200-line YAML manifests to run a React app and an API server.
+    Skr8tr cuts through it.
+  </p>
+  <div class="comparison">
+    <div class="comp-card them">
+      <h3>&#x2717; &nbsp;Kubernetes</h3>
+      <div class="comp-row"><span class="comp-icon" style="color:var(--red)">&#x2717;</span> 600+ MB control plane (etcd + apiserver + scheduler + controller-manager + ...)</div>
+      <div class="comp-row"><span class="comp-icon" style="color:var(--red)">&#x2717;</span> kubeconfig bearer tokens — base64-encoded secrets, effectively plaintext</div>
+      <div class="comp-row"><span class="comp-icon" style="color:var(--red)">&#x2717;</span> YAML + CRDs + Helm charts + kustomize layers</div>
+      <div class="comp-row"><span class="comp-icon" style="color:var(--red)">&#x2717;</span> Docker / containerd / runc / CNI — four abstraction layers to run a binary</div>
+      <div class="comp-row"><span class="comp-icon" style="color:var(--red)">&#x2717;</span> nginx-ingress as a separate Helm chart just to route HTTP</div>
+      <div class="comp-row"><span class="comp-icon" style="color:var(--red)">&#x2717;</span> Rollouts require readinessProbes, PodDisruptionBudgets, DeploymentStrategies</div>
+      <div class="comp-row"><span class="comp-icon" style="color:var(--red)">&#x2717;</span> Leader election, Raft consensus, SPOF etcd cluster</div>
+    </div>
+    <div class="comp-card us">
+      <h3>&#x2713; &nbsp;Skr8tr</h3>
+      <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> 5 MB total — three C23 binaries + a Rust CLI</div>
+      <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> ML-DSA-65 post-quantum signatures — key never leaves your machine</div>
+      <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> <code>.skr8tr</code> manifest — 6 lines to deploy an app</div>
+      <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> No Docker. Fork+exec. Any binary, any language.</div>
+      <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> Built-in HTTP ingress — longest-prefix routing, Tower discovery</div>
+      <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> <code>skr8tr rollout app.skr8tr</code> — one command, zero downtime</div>
+      <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> Masterless mesh — no etcd, no leader, no SPOF</div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="section-label">// FEATURES</div>
+  <h2>Everything you need.<br>Nothing you don't.</h2>
+  <p class="section-sub">Skr8tr is production-grade workload orchestration without the enterprise complexity tax.</p>
+  <div class="feat-grid">
+    <div class="feat-card">
+      <div class="feat-icon">&#x1F510;</div>
+      <h3>Post-Quantum Auth</h3>
+      <p>Every mutating command is ML-DSA-65 signed (CRYSTALS-Dilithium Level 3). Your signing key never touches the wire. Replay protection built in.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">&#x1F504;</div>
+      <h3>Rolling Updates</h3>
+      <p><code>skr8tr rollout app.skr8tr</code> — launch new replicas, wait for settle, drain old ones. One command. No readiness probe YAML required.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">&#x1F310;</div>
+      <h3>HTTP Ingress</h3>
+      <p>Built-in reverse proxy with longest-prefix route matching. Dynamic backend resolution via the Tower on every request. No nginx, no Envoy config.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">&#x1F9F5;</div>
+      <h3>Masterless Mesh</h3>
+      <p>No etcd, no Raft, no leader election. Every node is a sovereign peer. The Conductor schedules via UDP heartbeats. Add nodes by running the binary.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">&#x2696;&#xFE0F;</div>
+      <h3>Auto-Scaling</h3>
+      <p>CPU-triggered scale-up and scale-down with configurable thresholds. Min/max replica bounds. No metrics-server, no HPA objects.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">&#x1F50D;</div>
+      <h3>Service Discovery</h3>
+      <p>Built-in Tower registry. Services register automatically on launch, deregister on kill. Round-robin across replicas. Query with <code>skr8tr lookup</code>.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">&#x2764;&#xFE0F;</div>
+      <h3>Health Checks</h3>
+      <p>HTTP GET probes per workload. Configurable interval, timeout, retry count. Failed replicas are killed and relaunched automatically.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">&#x1F4DC;</div>
+      <h3>Log Streaming</h3>
+      <p>Per-process ring buffer (last 200 lines). Query with <code>skr8tr logs app</code>. Auto-resolved to the correct node — no SSH required.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">&#x26A1;</div>
+      <h3>Bare Metal Speed</h3>
+      <p>No container runtime. No OCI image pull. Fork + exec. Your binary starts in milliseconds, not seconds. Zero copy overhead on the data path.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- MANIFEST -->
+<section id="manifest">
+  <div class="section-label">// MANIFEST FORMAT</div>
+  <h2>Six lines to deploy. Not sixty.</h2>
+  <p class="section-sub">The <code>.skr8tr</code> manifest is Skr8tr's sovereign alternative to Kubernetes YAML. Human-readable. No anchors. No CRDs.</p>
+
+  <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1.5rem;">
+    <div>
+      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:0.6rem;font-family:var(--font-mono)">api-server.skr8tr</p>
+      <div class="code-block">
+<span class="kw">app</span> <span class="val">api-server</span>
+  <span class="kw">exec</span>     <span class="str">/usr/local/bin/myapi</span>
+  <span class="kw">args</span>     <span class="str">--port 8080 --db postgres.internal</span>
+  <span class="kw">port</span>     <span class="val">8080</span>
+  <span class="kw">replicas</span> <span class="val">3</span>
+  <span class="kw">health</span> {
+    <span class="kw">check</span>  <span class="str">GET /healthz 200</span>
+  }</div>
+    </div>
+    <div>
+      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:0.6rem;font-family:var(--font-mono)">with auto-scaling</p>
+      <div class="code-block">
+<span class="kw">app</span> <span class="val">api-server</span>
+  <span class="kw">exec</span>     <span class="str">/usr/local/bin/myapi</span>
+  <span class="kw">port</span>     <span class="val">8080</span>
+  <span class="kw">replicas</span> <span class="val">2</span>
+  <span class="kw">scale</span> {
+    <span class="kw">min</span>        <span class="val">1</span>
+    <span class="kw">max</span>        <span class="val">8</span>
+    <span class="kw">cpu-above</span>  <span class="val">80</span>
+    <span class="kw">cpu-below</span>  <span class="val">20</span>
+  }</div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- ARCHITECTURE -->
+<section id="arch">
+  <div class="section-label">// ARCHITECTURE</div>
+  <h2>Three binaries. Infinite nodes.</h2>
+  <p class="section-sub">Skr8tr's control plane is three C23 daemons and a Rust CLI. No etcd. No apiserver. No controller-manager. No scheduler pod. No kubelet.</p>
+
+  <div class="arch-diagram">
+<span class="hi">                              Internet / Cloud LB</span>
+<span class="hi">                                       │ HTTPS</span>
+<span class="hi">                            ┌──────────▼──────────┐</span>
+<span class="hi">                            │   skr8tr_ingress     │</span>  HTTP reverse proxy
+<span class="hi">                            │   (TCP :80)          │</span>  longest-prefix routing
+<span class="hi">                            └──────────┬──────────┘</span>
+                                       │ Tower LOOKUP
+<span class="grn">┌──────────────┐</span>  UDP :7771   <span class="grn">┌────────▼────────┐</span>
+<span class="grn">│  skr8tr CLI  │</span> ───────────▶ <span class="grn">│  skr8tr_sched   │</span>  The Conductor
+<span class="grn">│  (Rust)      │</span> ◀─────────── <span class="grn">│  ML-DSA-65 auth │</span>  Masterless scheduler
+<span class="grn">└──────────────┘</span>              <span class="grn">└────────┬────────┘</span>
+                                       │ LAUNCH via UDP :7775
+                              <span class="org">┌────────▼────────┐</span>
+                              <span class="org">│  skr8tr_node    │</span>  Fleet node (N nodes)
+                              <span class="org">│  fork + exec    │</span>  Runs your workloads
+                              <span class="org">└────────┬────────┘</span>
+                                       │ REGISTER via UDP :7772
+                              <span class="hi">┌────────▼────────┐</span>
+                              <span class="hi">│  skr8tr_reg     │</span>  The Tower
+                              <span class="hi">│  (UDP :7772)    │</span>  Service discovery
+                              <span class="hi">└─────────────────┘</span>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- INSTALL -->
+<section id="install">
+  <div class="section-label">// QUICK START</div>
+  <h2>Up in five minutes.</h2>
+  <p class="section-sub">Build from source, run three daemons, deploy your first workload.</p>
+
+  <div class="install-steps">
+    <div class="install-step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <h4>Clone and build</h4>
+        <div class="code-block">
+<span class="comment"># Dependencies: gcc (C23), liboqs ≥ 0.15, rustup</span>
+git clone https://github.com/NixOSDude/skr8tr
+cd skr8tr
+make                               <span class="comment"># builds all C23 daemons</span>
+cd cli && cargo build --release    <span class="comment"># builds the CLI</span>
+cp cli/target/release/skr8tr ~/.local/bin/</div>
+      </div>
+    </div>
+    <div class="install-step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <h4>Generate your signing keypair (once per operator machine)</h4>
+        <div class="code-block">
+bin/skrtrkey keygen
+<span class="comment"># → skrtrview.pub (1952 bytes) — copy to conductor host</span>
+<span class="comment"># → ~/.skr8tr/signing.sec (4032 bytes, chmod 600) — stays here</span></div>
+      </div>
+    </div>
+    <div class="install-step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <h4>Start the cluster</h4>
+        <div class="code-block">
+<span class="comment"># On the conductor/tower host:</span>
+nohup bin/skr8tr_reg   > /tmp/tower.log   2>&1 &
+nohup bin/skr8tr_sched --pubkey skrtrview.pub > /tmp/sched.log 2>&1 &
+
+<span class="comment"># On every worker node:</span>
+nohup bin/skr8tr_node  > /tmp/node.log   2>&1 &
+
+<span class="comment"># Optional: HTTP ingress</span>
+nohup bin/skr8tr_ingress --listen 80 --tower conductor-host \
+  --route /api:api-svc --route /:frontend > /tmp/ingress.log 2>&1 &</div>
+      </div>
+    </div>
+    <div class="install-step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <h4>Deploy your first workload</h4>
+        <div class="code-block">
+skr8tr ping                                                  <span class="comment"># verify cluster is up</span>
+skr8tr --key ~/.skr8tr/signing.sec up examples/api.skr8tr   <span class="comment"># deploy</span>
+skr8tr list                                                  <span class="comment"># verify running</span>
+skr8tr logs api-server                                       <span class="comment"># tail logs</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- CTA -->
+<div class="cta-section">
+  <div class="section-label">// GET INVOLVED</div>
+  <h2>Open source.<br>Apache 2.0.</h2>
+  <p>
+    Skr8tr is free, open source, and built in public. Star the repo, file issues,
+    submit PRs. If you're deploying it at scale or need enterprise support,
+    <a href="mailto:scott.bakerphx@gmail.com">reach out</a>.
+  </p>
+  <div class="hero-actions">
+    <a class="btn btn-primary" href="https://github.com/NixOSDude/skr8tr">&#x2605; Star on GitHub</a>
+    <a class="btn btn-secondary" href="https://github.com/NixOSDude/skr8tr/blob/main/OPERATIONS.md">Read the Docs &rarr;</a>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <p>
+    <strong style="color:var(--cyan)">skr8tr</strong> &nbsp;&bull;&nbsp;
+    <a href="https://github.com/NixOSDude/skr8tr">GitHub</a> &nbsp;&bull;&nbsp;
+    <a href="https://github.com/NixOSDude/skr8tr/blob/main/OPERATIONS.md">Docs</a> &nbsp;&bull;&nbsp;
+    <a href="mailto:scott.bakerphx@gmail.com">Contact</a>
+  </p>
+  <p style="margin-top:0.6rem; color: #404860;">
+    Apache 2.0 &nbsp;&mdash;&nbsp; Built with C23 + Rust &nbsp;&mdash;&nbsp; No Docker. No YAML. No k8s.
+  </p>
+</footer>
+
+</body>
+</html>
