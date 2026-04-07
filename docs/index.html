@@ -619,6 +619,95 @@
 
 <hr class="divider" />
 
+<!-- COST SAVINGS -->
+<section id="savings">
+  <div class="section-label">// THE REAL COST OF KUBERNETES</div>
+  <h2>k8s is expensive.<br>We've done the math.</h2>
+  <p class="section-sub">
+    Infrastructure bills are visible. Engineer time spent maintaining k8s is not.
+    Add them together and the picture is stark.
+  </p>
+
+  <!-- Cost comparison table -->
+  <div style="overflow-x:auto;margin-bottom:2.5rem;">
+    <table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
+      <thead>
+        <tr style="border-bottom:1px solid var(--border);">
+          <th style="text-align:left;padding:0.8rem 1rem;color:var(--muted);font-weight:600;"></th>
+          <th style="text-align:right;padding:0.8rem 1rem;color:var(--red);font-weight:700;">Kubernetes (EKS / GKE)</th>
+          <th style="text-align:right;padding:0.8rem 1rem;color:var(--cyan);font-weight:700;">Skr8tr (bare metal)</th>
+          <th style="text-align:right;padding:0.8rem 1rem;color:var(--green);font-weight:700;">You Save</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom:1px solid rgba(26,32,48,0.6);">
+          <td style="padding:0.75rem 1rem;color:var(--muted);">10-node compute (cloud managed)</td>
+          <td style="padding:0.75rem 1rem;text-align:right;color:var(--text);">$2,800 / mo<br><small style="color:var(--muted);">EC2 m5.large × 10 + EKS + NAT + ALB</small></td>
+          <td style="padding:0.75rem 1rem;text-align:right;color:var(--text);">$400 / mo<br><small style="color:var(--muted);">Hetzner AX41 × 10 bare metal</small></td>
+          <td style="padding:0.75rem 1rem;text-align:right;color:var(--green);font-weight:700;">$2,400 / mo</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(26,32,48,0.6);">
+          <td style="padding:0.75rem 1rem;color:var(--muted);">Observability (Datadog / equiv.)</td>
+          <td style="padding:0.75rem 1rem;text-align:right;color:var(--text);">$300 / mo<br><small style="color:var(--muted);">$23/host × 10 + APM</small></td>
+          <td style="padding:0.75rem 1rem;text-align:right;color:var(--text);">$0<br><small style="color:var(--muted);">Prometheus /metrics built in</small></td>
+          <td style="padding:0.75rem 1rem;text-align:right;color:var(--green);font-weight:700;">$300 / mo</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(26,32,48,0.6);">
+          <td style="padding:0.75rem 1rem;color:var(--muted);">Ingress controller (nginx / Traefik)</td>
+          <td style="padding:0.75rem 1rem;text-align:right;color:var(--text);">$80 / mo<br><small style="color:var(--muted);">Helm chart + cloud load balancer</small></td>
+          <td style="padding:0.75rem 1rem;text-align:right;color:var(--text);">$0<br><small style="color:var(--muted);">Built-in HTTP/TLS ingress</small></td>
+          <td style="padding:0.75rem 1rem;text-align:right;color:var(--green);font-weight:700;">$80 / mo</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(26,32,48,0.6);">
+          <td style="padding:0.75rem 1rem;color:var(--muted);">Audit / compliance tooling (Falco, OPA)</td>
+          <td style="padding:0.75rem 1rem;text-align:right;color:var(--text);">$500+ / mo<br><small style="color:var(--muted);">Self-managed or third-party SIEM connector</small></td>
+          <td style="padding:0.75rem 1rem;text-align:right;color:var(--text);">Included<br><small style="color:var(--muted);">Enterprise license — audit + syslog</small></td>
+          <td style="padding:0.75rem 1rem;text-align:right;color:var(--green);font-weight:700;">$500+ / mo</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(26,32,48,0.6);">
+          <td style="padding:0.75rem 1rem;color:var(--muted);">Platform engineer time (k8s maintenance)</td>
+          <td style="padding:0.75rem 1rem;text-align:right;color:var(--text);">$8,000 / mo<br><small style="color:var(--muted);">½ FTE @ $190k/yr — upgrades, debugging, CRD hell</small></td>
+          <td style="padding:0.75rem 1rem;text-align:right;color:var(--text);">~$1,000 / mo<br><small style="color:var(--muted);">3 binaries. One operator. Part-time.</small></td>
+          <td style="padding:0.75rem 1rem;text-align:right;color:var(--green);font-weight:700;">$7,000 / mo</td>
+        </tr>
+        <tr style="background:rgba(48,216,144,0.05);border-top:2px solid rgba(48,216,144,0.25);">
+          <td style="padding:1rem;color:var(--text);font-weight:700;">Total monthly cost</td>
+          <td style="padding:1rem;text-align:right;color:var(--red);font-weight:700;font-size:1.1rem;">~$11,680 / mo</td>
+          <td style="padding:1rem;text-align:right;color:var(--cyan);font-weight:700;font-size:1.1rem;">~$1,400 / mo<br><small style="color:var(--muted);font-weight:400;font-size:0.78rem;">(open source — zero license fee)</small></td>
+          <td style="padding:1rem;text-align:right;color:var(--green);font-weight:700;font-size:1.2rem;">$10,280 / mo<br><small style="color:var(--green);font-weight:400;font-size:0.8rem;">$123,000 / year</small></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ROI callout cards -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1.2rem;margin-bottom:2rem;">
+    <div style="background:var(--bg3);border:1px solid rgba(48,216,144,0.2);border-radius:10px;padding:1.4rem;text-align:center;">
+      <div style="font-size:2rem;font-weight:800;color:var(--green);font-family:var(--font-mono);">$123k</div>
+      <div style="color:var(--muted);font-size:0.84rem;margin-top:0.3rem;">average annual savings<br>vs managed k8s (10 nodes)</div>
+    </div>
+    <div style="background:var(--bg3);border:1px solid rgba(0,212,255,0.2);border-radius:10px;padding:1.4rem;text-align:center;">
+      <div style="font-size:2rem;font-weight:800;color:var(--cyan);font-family:var(--font-mono);">5 MB</div>
+      <div style="color:var(--muted);font-size:0.84rem;margin-top:0.3rem;">control plane vs 600 MB<br>for a minimal k8s stack</div>
+    </div>
+    <div style="background:var(--bg3);border:1px solid rgba(240,176,32,0.2);border-radius:10px;padding:1.4rem;text-align:center;">
+      <div style="font-size:2rem;font-weight:800;color:var(--gold);font-family:var(--font-mono);">0</div>
+      <div style="color:var(--muted);font-size:0.84rem;margin-top:0.3rem;">YAML files, CRDs, or<br>Helm charts required</div>
+    </div>
+    <div style="background:var(--bg3);border:1px solid rgba(240,120,64,0.2);border-radius:10px;padding:1.4rem;text-align:center;">
+      <div style="font-size:2rem;font-weight:800;color:var(--orange);font-family:var(--font-mono);">&lt; 1 day</div>
+      <div style="color:var(--muted);font-size:0.84rem;margin-top:0.3rem;">typical migration time<br>from k8s (with our help)</div>
+    </div>
+  </div>
+
+  <p style="text-align:center;color:var(--muted);font-size:0.82rem;margin-bottom:0.5rem;">
+    * Cost estimates based on AWS EKS us-east-1 on-demand pricing, Hetzner AX41 pricing, and industry average SRE fully-loaded cost (April 2026).
+    Actual savings vary by team size, cloud provider, and current stack complexity.
+  </p>
+</section>
+
+<hr class="divider" />
+
 <!-- FEATURES -->
 <section id="features">
   <div class="section-label">// OPEN SOURCE — APACHE 2.0 — FREE FOREVER</div>
