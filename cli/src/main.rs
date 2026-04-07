@@ -187,6 +187,14 @@ enum Commands {
         #[arg(long)]
         node: Option<String>,
     },
+    /// Tail the last N entries from the cryptographic audit ledger
+    Audit {
+        /// Number of entries to display (default: 20)
+        #[arg(default_value_t = 20)]
+        n: u32,
+    },
+    /// Walk the full audit chain and verify every SHA-256 hash link
+    AuditVerify,
 }
 
 // -------------------------------------------------------------------------
@@ -426,6 +434,42 @@ fn cmd_logs(cli: &Cli, app: &str, node_override: Option<&str>) {
     }
 }
 
+fn cmd_audit(cli: &Cli, n: u32) {
+    match udp_send(&cli.conductor, 7771, &format!("AUDIT|{n}"), cli.timeout_ms) {
+        Ok(r) if r.starts_with("OK|AUDIT|") => {
+            let body = &r["OK|AUDIT|".len()..];
+            println!("  audit log — last {n} entries:");
+            println!("  {}", "-".repeat(72));
+            for line in body.split('\n') {
+                if !line.is_empty() { println!("  {line}"); }
+            }
+        }
+        Ok(r)  => println!("  {r}"),
+        Err(e) => println!("  error: {e}"),
+    }
+}
+
+fn cmd_audit_verify(cli: &Cli) {
+    print!("  verifying audit chain... ");
+    match udp_send(&cli.conductor, 7771, "AUDIT_VERIFY", cli.timeout_ms * 3) {
+        Ok(r) if r.starts_with("OK|AUDIT_VERIFY|OK") => {
+            let parts: Vec<&str> = r.splitn(4, '|').collect();
+            let detail = parts.get(3).unwrap_or(&"");
+            println!("ok");
+            println!("  {detail}");
+        }
+        Ok(r) if r.starts_with("OK|AUDIT_VERIFY|FAIL") => {
+            let parts: Vec<&str> = r.splitn(4, '|').collect();
+            let detail = parts.get(3).unwrap_or(&"chain broken");
+            println!("CHAIN BROKEN");
+            println!("  {detail}");
+            std::process::exit(1);
+        }
+        Ok(r)  => println!("\n  {r}"),
+        Err(e) => println!("\n  error: {e}"),
+    }
+}
+
 fn cmd_rollout(cli: &Cli, manifest: &str) {
     let path = std::fs::canonicalize(manifest)
         .unwrap_or_else(|_| std::path::PathBuf::from(manifest));
@@ -484,5 +528,7 @@ fn main() {
         Commands::Lookup  { service }  => cmd_lookup(&cli, service),
         Commands::Ping                 => cmd_ping(&cli),
         Commands::Logs { app, node }   => cmd_logs(&cli, app, node.as_deref()),
+        Commands::Audit { n }          => cmd_audit(&cli, *n),
+        Commands::AuditVerify          => cmd_audit_verify(&cli),
     }
 }
