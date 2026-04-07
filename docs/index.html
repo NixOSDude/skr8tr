@@ -295,6 +295,92 @@
     }
     .step-body p { font-size: 0.88rem; color: var(--muted); }
 
+    /* ── ENTERPRISE ── */
+    .enterprise-section {
+      padding: 5rem 2rem;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.4rem;
+      margin-bottom: 3.5rem;
+    }
+    .pricing-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      transition: border-color 0.2s;
+    }
+    .pricing-card:hover { border-color: var(--muted); }
+    .pricing-card.featured {
+      border-color: rgba(0,212,255,0.4);
+      background: rgba(0,212,255,0.04);
+    }
+    .pricing-badge {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--cyan);
+      letter-spacing: 0.12em;
+      margin-bottom: 0.6rem;
+    }
+    .pricing-card h3 { font-size: 1.15rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .pricing-price {
+      font-family: var(--font-mono);
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--cyan);
+      margin-bottom: 1rem;
+    }
+    .pricing-price span { font-size: 0.85rem; color: var(--muted); font-weight: 400; }
+    .pricing-card p { font-size: 0.88rem; color: var(--muted); line-height: 1.6; flex: 1; margin-bottom: 1.4rem; }
+    .pricing-features { list-style: none; margin-bottom: 1.6rem; }
+    .pricing-features li {
+      font-size: 0.86rem;
+      color: var(--muted);
+      padding: 0.3rem 0;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 0.6rem;
+      align-items: baseline;
+    }
+    .pricing-features li:last-child { border-bottom: none; }
+    .pricing-features li::before { content: "→"; color: var(--cyan); flex-shrink: 0; }
+    .btn-enterprise {
+      display: inline-block;
+      background: transparent;
+      color: var(--cyan);
+      border: 1px solid var(--cyan);
+      padding: 0.65rem 1.4rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      text-align: center;
+      transition: all 0.2s;
+      text-decoration: none;
+    }
+    .btn-enterprise:hover { background: var(--cyan); color: #040608; text-decoration: none; }
+    .btn-enterprise.solid { background: var(--cyan); color: #040608; }
+    .btn-enterprise.solid:hover { background: #33ddff; }
+    .enterprise-features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin-bottom: 3rem;
+    }
+    .ef-card {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.2rem 1.4rem;
+    }
+    .ef-card h4 { font-size: 0.92rem; font-weight: 700; color: var(--gold); margin-bottom: 0.4rem; }
+    .ef-card p  { font-size: 0.84rem; color: var(--muted); line-height: 1.5; }
+
     /* ── CTA ── */
     .cta-section {
       text-align: center;
@@ -335,6 +421,7 @@
     <li><a href="#install">Install</a></li>
     <li><a href="#manifest">Manifests</a></li>
     <li><a href="#arch">Architecture</a></li>
+    <li><a href="#enterprise" style="color:var(--gold)">Enterprise</a></li>
     <li><a href="/blog/">Blog</a></li>
     <li><a href="https://github.com/NixOSDude/skr8tr">GitHub</a></li>
   </ul>
@@ -637,6 +724,91 @@ skr8tr logs api-server                                       <span class="commen
 
 <hr class="divider" />
 
+<!-- ENTERPRISE -->
+<hr class="divider" />
+<div id="enterprise" class="enterprise-section">
+  <div class="section-label">// ENTERPRISE &amp; CONSULTING</div>
+  <h2>Skip the k8s migration hell.<br>We've already done it.</h2>
+  <p class="section-sub">
+    Skr8tr is Apache 2.0 — free forever. For teams that want expert deployment,
+    custom integrations, or enterprise-grade features (RBAC, audit logs, SSO),
+    we offer hands-on professional services.
+  </p>
+
+  <!-- Enterprise-only features teaser -->
+  <div class="enterprise-features-grid">
+    <div class="ef-card">
+      <h4>RBAC &amp; Namespaces</h4>
+      <p>Role-based access control with team namespaces, ML-DSA-65 signed per-team keys, and permission scopes: read / submit / evict / admin.</p>
+    </div>
+    <div class="ef-card">
+      <h4>Audit Export</h4>
+      <p>Structured, cryptographically chained audit log shipped to S3, Elasticsearch, or any SIEM. Tamper-evident, append-only, queryable.</p>
+    </div>
+    <div class="ef-card">
+      <h4>SSO / OIDC</h4>
+      <p>Identity federation with your existing IdP — Okta, Azure AD, Google Workspace. Bridge OIDC tokens to ML-DSA-65 signing credentials.</p>
+    </div>
+    <div class="ef-card">
+      <h4>Multi-tenant Conductor</h4>
+      <p>Resource quotas, namespace isolation, and per-team scheduling policies — run multiple product teams on one Skr8tr cluster safely.</p>
+    </div>
+  </div>
+
+  <!-- Services pricing cards -->
+  <div class="pricing-grid">
+    <div class="pricing-card">
+      <div class="pricing-badge">// CONSULTING</div>
+      <h3>Cluster Setup &amp; Migration</h3>
+      <div class="pricing-price">$1,500 <span>/ day</span></div>
+      <p>We design and deploy your Skr8tr cluster — bare metal, cloud, or hybrid. Migration from Kubernetes: workload audit, manifest conversion, ingress routing, CI/CD rework, PQC key provisioning.</p>
+      <ul class="pricing-features">
+        <li>Bare metal, cloud, or hybrid clusters</li>
+        <li>Full k8s migration (workloads, ingress, CI/CD)</li>
+        <li>PQC key provisioning + operator training</li>
+        <li>30-day post-deployment support included</li>
+      </ul>
+      <a class="btn-enterprise" href="mailto:107740546+NixOSDude@users.noreply.github.com?subject=Skr8tr%20Cluster%20Setup">Get a Quote &rarr;</a>
+    </div>
+
+    <div class="pricing-card featured">
+      <div class="pricing-badge">// ARCHITECTURE REVIEW</div>
+      <h3>Infrastructure Audit</h3>
+      <div class="pricing-price">$1,000 <span>flat</span></div>
+      <p>A focused 2-hour deep dive into your current orchestration stack. We identify bottlenecks, security gaps, and waste. Written recommendations delivered within 48 hours — actionable, no fluff.</p>
+      <ul class="pricing-features">
+        <li>Current stack analysis (k8s, ECS, Nomad, etc.)</li>
+        <li>Bottleneck + security gap identification</li>
+        <li>Written report with prioritized recommendations</li>
+        <li>1 follow-up call included</li>
+      </ul>
+      <a class="btn-enterprise solid" href="mailto:107740546+NixOSDude@users.noreply.github.com?subject=Skr8tr%20Architecture%20Review">Book a Review &rarr;</a>
+    </div>
+
+    <div class="pricing-card">
+      <div class="pricing-badge">// TRAINING</div>
+      <h3>Team Workshops</h3>
+      <div class="pricing-price">$2,000 <span>/ day</span></div>
+      <p>Half-day or full-day workshops for engineering teams. Topics: C23 systems programming, Skr8tr operations, post-quantum security fundamentals, and migrating off Docker/k8s.</p>
+      <ul class="pricing-features">
+        <li>Remote or on-site</li>
+        <li>Customized to your stack and team level</li>
+        <li>Hands-on labs with your real workloads</li>
+        <li>Workshop materials + recording included</li>
+      </ul>
+      <a class="btn-enterprise" href="mailto:107740546+NixOSDude@users.noreply.github.com?subject=Skr8tr%20Workshop">Inquire &rarr;</a>
+    </div>
+  </div>
+
+  <div style="text-align:center; padding: 1rem 0 0.5rem;">
+    <p style="color:var(--muted); font-size:0.92rem; margin-bottom:1.4rem;">
+      All serious inquiries get a response within 24 hours.<br>
+      Include your node count, workload types, and current orchestrator — we'll come back with a concrete proposal.
+    </p>
+    <a class="btn btn-primary" href="mailto:107740546+NixOSDude@users.noreply.github.com?subject=Skr8tr%20Enterprise%20Inquiry">Contact Us &rarr;</a>
+  </div>
+</div>
+
 <!-- CTA -->
 <div class="cta-section">
   <div class="section-label">// GET INVOLVED</div>
@@ -644,7 +816,7 @@ skr8tr logs api-server                                       <span class="commen
   <p>
     Skr8tr is free, open source, and built in public. Star the repo, file issues,
     submit PRs. If you're deploying it at scale or need enterprise support,
-    <a href="mailto:scott.bakerphx@gmail.com">reach out</a>.
+    <a href="mailto:107740546+NixOSDude@users.noreply.github.com">reach out</a>.
   </p>
   <div class="hero-actions">
     <a class="btn btn-primary" href="https://github.com/NixOSDude/skr8tr">&#x2605; Star on GitHub</a>
@@ -658,7 +830,9 @@ skr8tr logs api-server                                       <span class="commen
     <strong style="color:var(--cyan)">skr8tr</strong> &nbsp;&bull;&nbsp;
     <a href="https://github.com/NixOSDude/skr8tr">GitHub</a> &nbsp;&bull;&nbsp;
     <a href="https://github.com/NixOSDude/skr8tr/blob/main/OPERATIONS.md">Docs</a> &nbsp;&bull;&nbsp;
-    <a href="mailto:scott.bakerphx@gmail.com">Contact</a>
+    <a href="/blog/">Blog</a> &nbsp;&bull;&nbsp;
+    <a href="#enterprise" style="color:var(--gold)">Enterprise</a> &nbsp;&bull;&nbsp;
+    <a href="mailto:107740546+NixOSDude@users.noreply.github.com">Contact</a>
   </p>
   <p style="margin-top:0.6rem; color: #404860;">
     Apache 2.0 &nbsp;&mdash;&nbsp; Built with C23 + Rust &nbsp;&mdash;&nbsp; No Docker. No YAML. No k8s.

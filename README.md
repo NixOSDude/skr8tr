@@ -222,11 +222,11 @@ For organizations that need:
 - **SSO / OIDC** — identity federation, single sign-on
 - **Multi-tenant conductor** — resource quotas and namespace isolation per team
 
-→ [Contact us](mailto:scott.bakerphx@gmail.com) to discuss enterprise licensing.
+→ [Contact us](mailto:107740546+NixOSDude@users.noreply.github.com) to discuss enterprise licensing.
 
 ### Get in Touch
 
-**Email:** [scott.bakerphx@gmail.com](mailto:scott.bakerphx@gmail.com)
+**Email:** [107740546+NixOSDude@users.noreply.github.com](mailto:107740546+NixOSDude@users.noreply.github.com)
 
 **Website:** [skr8tr.online](https://skr8tr.online)
 
