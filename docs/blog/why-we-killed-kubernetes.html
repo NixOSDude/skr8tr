@@ -45,15 +45,10 @@
       height: 56px;
       display: flex; align-items: center; justify-content: space-between;
     }
-    .nav-brand {
-      font-family: var(--font-mono);
-      font-size: 1.1rem;
-      font-weight: bold;
-      color: var(--cyan);
-      letter-spacing: 0.08em;
-      text-decoration: none;
+    .nav-brand img {
+      height: 30px;
+      width: auto;
     }
-    .nav-brand span { color: var(--orange); }
     .nav-links { display: flex; gap: 1.8rem; list-style: none; }
     .nav-links a { color: var(--muted); font-size: 0.88rem; transition: color 0.2s; }
     .nav-links a:hover { color: var(--text); text-decoration: none; }
@@ -290,7 +285,7 @@
 <body>
 
 <nav>
-  <a class="nav-brand" href="/"><span>sk</span>r8<span>tr</span></a>
+  <a href="/"><img src="/skr8tr.svg" alt="skr8tr" class="nav-brand" /></a>
   <ul class="nav-links">
     <li><a href="/">Home</a></li>
     <li><a href="/#features">Features</a></li>

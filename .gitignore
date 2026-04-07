@@ -4,4 +4,13 @@ cli/target/
 *.d
 *.tmp
 .DS_Store
+
+# Site-specific keys — regenerate per installation
 skrtrview.pub
+
+# Internal session / AI collaboration files — not for public repo
+CLAUDE.md
+SESSION_STATE.md
+
+# Root-level logo source (web copy lives in docs/)
+skr8tr.svg

@@ -47,14 +47,10 @@
       height: 56px;
       display: flex; align-items: center; justify-content: space-between;
     }
-    .nav-brand {
-      font-family: var(--font-mono);
-      font-size: 1.1rem;
-      font-weight: bold;
-      color: var(--cyan);
-      letter-spacing: 0.08em;
+    .nav-brand img {
+      height: 32px;
+      width: auto;
     }
-    .nav-brand span { color: var(--orange); }
     .nav-links { display: flex; gap: 1.8rem; list-style: none; }
     .nav-links a { color: var(--muted); font-size: 0.88rem; transition: color 0.2s; }
     .nav-links a:hover { color: var(--text); text-decoration: none; }
@@ -329,7 +325,7 @@
 
 <!-- NAV -->
 <nav>
-  <div class="nav-brand"><span>sk</span>r8<span>tr</span></div>
+  <a href="/"><img src="/skr8tr.svg" alt="skr8tr" class="nav-brand" /></a>
   <ul class="nav-links">
     <li><a href="#why">Why</a></li>
     <li><a href="#features">Features</a></li>
@@ -344,7 +340,7 @@
 <!-- HERO -->
 <div class="hero">
   <div class="hero-badge">&#x26A1; OPEN SOURCE &nbsp;&bull;&nbsp; C23 + RUST &nbsp;&bull;&nbsp; POST-QUANTUM AUTH</div>
-  <h1><span class="sk">sk</span>r<span class="r8">8</span>tr</h1>
+  <img src="/skr8tr.svg" alt="skr8tr" style="height:90px;width:auto;margin-bottom:1.2rem;" />
   <p class="hero-tagline">
     The <strong>sovereign workload orchestrator.</strong><br>
     No Docker. No YAML. No Kubernetes.<br>
