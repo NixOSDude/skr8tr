@@ -604,23 +604,25 @@ spec:
       manifest. The binary was already on disk. That is the entire deployment step.
     </div>
 
-    <h2>What Skr8tr Does Not Do (Yet)</h2>
+    <h2>Design Decisions Worth Knowing</h2>
 
     <p>
-      Honest accounting. These are genuine gaps relative to a mature k8s installation:
+      Skr8tr is purpose-built for teams running their own services on nodes they control.
+      A few deliberate design choices:
     </p>
 
     <ul>
-      <li><strong>No network namespace isolation</strong> — workloads share the host network. This is fine for most services; it is not acceptable for multi-tenant untrusted workloads. Container isolation is not planned for the core.</li>
-      <li><strong>No TLS termination at the ingress</strong> — we terminate at the cloud load balancer. The ingress runs plain HTTP internally. Standard production pattern, but if you need edge TLS in the binary itself, it is not there yet.</li>
-      <li><strong>No persistent volume management</strong> — stateful workloads (Postgres, etc.) are run outside Skr8tr for now, or bind-mounted from host paths. No CSI driver equivalent.</li>
-      <li><strong>No image registry</strong> — binaries must be pre-placed on nodes. We use a simple <code>rsync</code> step in CI. Not elegant, but it is explicit and fast.</li>
+      <li><strong>No container runtime</strong> — workloads are bare processes on the host network. No OCI, no overlay filesystems, no image pull latency. If you need kernel-level namespace isolation for untrusted multi-tenant workloads, that is a container runtime job, not an orchestrator job.</li>
+      <li><strong>TLS at ingress</strong> — <code>skr8tr_ingress</code> supports TLS termination via <code>--tls-cert</code> and <code>--tls-key</code>. You can also terminate at a cloud load balancer (ALB, GCP HTTPS LB, Cloudflare) and run plain HTTP internally — both patterns are supported.</li>
+      <li><strong>Persistent volumes</strong> — the <code>volume {}</code> manifest block bind-mounts host paths into workloads as environment variables post-fork. Stateful services (Postgres, etc.) work today. No CSI driver — host paths are explicit and auditable.</li>
+      <li><strong>No image registry</strong> — binaries are pre-placed on nodes. A simple <code>rsync</code> step in CI is faster and more explicit than a 200 MB image push. Skr8tr calls <code>fork()</code> and <code>execve()</code> — the binary is already on disk.</li>
+      <li><strong>Multi-tenant RBAC and namespace isolation</strong> — available in the enterprise tier. Per-team ML-DSA-65 keys, namespace quotas, and full audit trail. See <a href="https://skr8tr.online/#enterprise">skr8tr.online/#enterprise</a>.</li>
     </ul>
 
     <p>
-      If you need multi-tenant container isolation, network policies, or a distributed block
-      storage system, Kubernetes is a reasonable answer. If you are running your own services
-      on nodes you control, it is likely overkill.
+      If you are running a Kubernetes cluster for your own services, Skr8tr is likely the
+      simpler answer. If you need multi-tenant container isolation with network policies,
+      Kubernetes is the right tool for that specific problem.
     </p>
 
     <h2>The Source</h2>

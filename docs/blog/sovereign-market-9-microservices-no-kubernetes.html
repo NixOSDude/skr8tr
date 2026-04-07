@@ -436,21 +436,21 @@ nohup skr8tr_node > /tmp/node.log 2>&1 &
       deployment. The k8s numbers are from running minikube / k3s on the same hardware.
     </p>
 
-    <h2>What honest limitations look like</h2>
+    <h2>Design decisions worth knowing</h2>
     <p>
-      skr8tr is not Kubernetes. There are things it does not do yet:
+      Skr8tr is purpose-built for teams running their own services on nodes they control.
+      A few deliberate design choices:
     </p>
     <ul>
-      <li><strong>No persistent volume claims.</strong> Services that need durable storage need to manage it themselves (NFS mount, NVMe path, etc).</li>
-      <li><strong>No namespace isolation.</strong> All workloads share the same node. RBAC namespaces are in the enterprise tier.</li>
-      <li><strong>No pod networking abstraction.</strong> Services talk to each other over host IPs resolved via the Tower registry. You bind to <code>0.0.0.0</code> and call other services by querying Tower.</li>
-      <li><strong>HTTP/1.1 ingress only.</strong> No HTTP/2, no gRPC proxying in the current ingress. Planned.</li>
-      <li><strong>The settle window is hardcoded.</strong> Rolling updates wait 8 seconds before killing the old replica. No HTTP readiness check during that window yet.</li>
+      <li><strong>Persistent volumes via host paths.</strong> The <code>volume {}</code> manifest block bind-mounts host paths into workloads as environment variables post-fork. For SovereignMarket's stateless services this is not needed — but for stateful workloads it is there.</li>
+      <li><strong>No pod networking abstraction.</strong> Services talk to each other over host IPs resolved via the Tower registry. You bind to <code>0.0.0.0</code> and call other services by name — Tower does the resolution. No overlay network, no kube-proxy, no iptables rules.</li>
+      <li><strong>HTTP/2 in the enterprise tier.</strong> The OSS ingress is HTTP/1.1. HTTP/2 with ALPN negotiation is available in the enterprise tier — suitable for gRPC and multiplexed frontends. See <a href="https://skr8tr.online/#enterprise">skr8tr.online/#enterprise</a>.</li>
+      <li><strong>RBAC namespace isolation in the enterprise tier.</strong> Per-team ML-DSA-65 keys and namespace quotas. See <a href="https://skr8tr.online/#enterprise">skr8tr.online/#enterprise</a>.</li>
+      <li><strong>Rolling updates with HTTP readiness probes.</strong> The rollout thread polls the new replica's health endpoint during the settle window and cuts over as soon as the probe passes — no fixed sleep required.</li>
     </ul>
     <p>
-      For SovereignMarket — a stateless REST API + static Angular frontend — none of these
-      are blockers. All 9 services are stateless (in-memory data, which would be a DB in a
-      real deployment). This is exactly the workload skr8tr is built for.
+      For SovereignMarket — stateless REST APIs + Angular frontend — the OSS tier covers
+      everything. This is exactly the workload skr8tr is built for.
     </p>
 
     <h2>Build the Rust services yourself</h2>

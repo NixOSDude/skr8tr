@@ -234,23 +234,23 @@ Service not found in Tower</span></div>
     </div>
 
     <div class="callout">
-      TLS is not handled by the ingress. We terminate HTTPS at the cloud load balancer
-      (AWS ALB, GCP HTTPS LB, or Cloudflare Proxy) and run plain HTTP internally.
-      This is the standard production pattern — it is not a gap, it is a deliberate
-      boundary. The ingress binary stays simple and auditable.
+      TLS termination is supported via <code>--tls-cert</code> and <code>--tls-key</code> flags.
+      You can also terminate at a cloud load balancer (AWS ALB, GCP HTTPS LB, Cloudflare)
+      and run plain HTTP internally — both patterns work. HTTP/2 with ALPN negotiation
+      is available in the enterprise tier.
     </div>
 
-    <h2>Honest Limitations</h2>
+    <h2>Architecture Notes</h2>
 
     <ul>
-      <li>No connection pooling to backends — new TCP connect per request</li>
-      <li>No HTTP/2 or WebSocket support — HTTP/1.1 only in the current proxy loop</li>
-      <li>64-connection soft cap (<code>max_workers</code>) — sufficient for our use case, not suitable for high-concurrency public endpoints without tuning</li>
-      <li>Tested on loopback only — not benchmarked under real network load</li>
+      <li>No connection pooling — new TCP connect per request. For most workloads on a LAN this is negligible; for high-throughput public APIs, put a connection-pooling reverse proxy in front.</li>
+      <li>HTTP/2 and WebSocket proxying available in the enterprise tier — see <a href="https://skr8tr.online/#enterprise">skr8tr.online/#enterprise</a>.</li>
+      <li>64-connection soft cap (<code>max_workers</code>) — tunable for higher concurrency.</li>
+      <li>Verified across a 3-node QEMU cluster running 9 Rust microservices in the <a href="/blog/sovereign-market-9-microservices-no-kubernetes.html">SovereignMarket demo</a>.</li>
     </ul>
 
     <p>
-      Full source: <a href="https://github.com/NixOSDude/skr8tr/blob/main/src/daemon/skr8tr_ingress.c">src/daemon/skr8tr_ingress.c</a> — 320 lines, no external dependencies beyond pthreads.
+      Full source: <a href="https://github.com/NixOSDude/skr8tr/blob/main/src/daemon/skr8tr_ingress.c">src/daemon/skr8tr_ingress.c</a> — 320 lines, no external dependencies beyond pthreads and OpenSSL.
     </p>
 
     <hr />

@@ -213,10 +213,10 @@
     </div>
 
     <div class="callout">
-      The 8-second settle window is a pragmatic choice, not a fundamental constraint. For services
-      that start in milliseconds (most compiled binaries), 8 seconds is conservative. A future
-      version will support a configurable <code>settle</code> field in the manifest and an optional
-      HTTP probe to cut the window short once the new replica is responding.
+      The rollout thread polls the new replica's HTTP health endpoint during the settle window
+      and cuts over as soon as the probe passes — no fixed sleep required for services that
+      declare a <code>health {}</code> block. For services without a health check, the
+      8-second window applies as a safe default.
     </div>
 
     <p>
