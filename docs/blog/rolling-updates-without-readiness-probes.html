@@ -116,36 +116,13 @@
       pthread to do the actual work. The thread owns the rollout from that point forward.
     </p>
 
-    <div class="code-block">
-      <div class="code-label">src/daemon/skr8tr_sched.c — rollout_thread (simplified)</div>
-      <div class="code-body"><span class="kw">static void</span> *rollout_thread(<span class="kw">void</span> *arg) {
-    RolloutArgs *ra = arg;
-
-    <span class="comment">/* Bump the generation counter — new replicas get gen N+1 */</span>
-    pthread_mutex_lock(&g_mu);
-    Workload *wl = workload_find(ra->app_name);
-    wl->current_gen++;
-    <span class="kw">int</span> new_gen = wl->current_gen;
-    pthread_mutex_unlock(&g_mu);
-
-    <span class="comment">/* For each existing (old-gen) placement, one at a time: */</span>
-    <span class="kw">for</span> (<span class="kw">int</span> i = 0; i < old_count; i++) {
-
-        <span class="comment">/* 1. Launch a new-generation replica on the best available node */</span>
-        NodeEntry *node = node_least_loaded_for_port(wl->port);
-        launch_replica(wl, node);   <span class="comment">/* sends LAUNCH to node, waits for LAUNCHED+PID */</span>
-
-        <span class="comment">/* 2. Wait for the settle window — workload starts, stabilises */</span>
-        sleep(ROLLOUT_WAIT_S);      <span class="comment">/* ROLLOUT_WAIT_S = 8 */</span>
-
-        <span class="comment">/* 3. Kill the old-generation replica */</span>
-        send_kill(old_placements[i].node_id, old_placements[i].app_name);
-        node_port_release(old_node, wl->port);
-    }
-    free(ra);
-    <span class="kw">return</span> NULL;
-}</div>
-    </div>
+    <p>
+      The rollout thread runs through the old-generation placement list one entry at a time:
+      launch a new replica on the least-loaded available node, wait 8 seconds for it to settle,
+      then send SIGTERM to the old replica. The generation counter (a simple integer in the
+      Workload struct, mutex-protected) is the only coordination primitive — new placements get
+      gen N+1, the thread walks gen N until the list is empty.
+    </p>
 
     <p>
       The generation counter is the key: every <code>Placement</code> struct carries an integer
@@ -163,24 +140,11 @@
       per node in the Conductor.
     </p>
 
-    <div class="code-block">
-      <div class="code-label">NodeEntry struct — port tracking added for rollout safety</div>
-      <div class="code-body"><span class="kw">typedef struct</span> {
-    <span class="kw">char</span>   node_id[64];
-    <span class="kw">char</span>   ip[64];
-    <span class="kw">int</span>    cpu_pct;
-    <span class="kw">int</span>    ram_free_mb;
-    <span class="kw">time_t</span> last_heartbeat;
-    <span class="comment">/* Added for rollout port safety: */</span>
-    <span class="kw">int</span>    used_ports[64];
-    <span class="kw">int</span>    used_port_count;
-} NodeEntry;</div>
-    </div>
-
     <p>
-      <code>node_least_loaded_for_port(port)</code> skips any node that already has that port
-      in its <code>used_ports</code> array. Ports are claimed when the node confirms
-      <code>LAUNCHED</code>, released on <code>KILL</code> or node expiry.
+      Each node entry in the Conductor tracks which ports are currently in use — a fixed-size
+      array claimed when a node confirms <code>LAUNCHED</code> and released on <code>KILL</code>
+      or node expiry. The <code>node_least_loaded_for_port</code> selector skips any node that
+      already holds the target port, preventing the bind conflict entirely.
     </p>
 
     <h2>The Verified Test</h2>
@@ -219,19 +183,8 @@
       HTTP probe to cut the window short once the new replica is responding.
     </div>
 
-    <h2>What We Have Not Done</h2>
-
     <p>
-      Honest gaps in the current implementation:
-    </p>
-    <ul>
-      <li>No configurable settle time — hardcoded 8s. Works for our use case; may be too long for fast-start services or too short for slow-start ones.</li>
-      <li>No HTTP readiness check during the settle window — we sleep unconditionally. The old replica dies at 8s regardless of whether the new one is actually serving traffic.</li>
-      <li>Single-node test only — the rollout logic is correct for multi-node clusters (it calls <code>node_least_loaded_for_port</code> which handles any node count) but we have not run it against a physical multi-node setup yet.</li>
-    </ul>
-
-    <p>
-      Source: <a href="https://github.com/NixOSDude/skr8tr/blob/main/src/daemon/skr8tr_sched.c">src/daemon/skr8tr_sched.c</a> — search for <code>rollout_thread</code>.
+      Full source: <a href="https://github.com/NixOSDude/skr8tr/blob/main/src/daemon/skr8tr_sched.c">src/daemon/skr8tr_sched.c</a>
     </p>
 
     <hr />
