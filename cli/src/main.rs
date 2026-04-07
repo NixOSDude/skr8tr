@@ -4,14 +4,15 @@
 // SSoA LEVEL 3 — Manifest Shard (operator-facing CLI)
 //
 // Commands:
-//   skr8tr up   <manifest.skr8tr>   — submit workload to Conductor
-//   skr8tr down <app_name>          — evict all replicas of a workload
-//   skr8tr status                   — show live nodes and placed workloads
-//   skr8tr nodes                    — show live node metrics
-//   skr8tr list                     — show all running workloads
-//   skr8tr lookup <service>         — resolve a service name via the Tower
-//   skr8tr logs  <app>              — fetch stdout/stderr ring buffer
-//   skr8tr ping                     — ping Conductor and Tower
+//   skr8tr up      <manifest.skr8tr>  — submit workload to Conductor
+//   skr8tr down    <app_name>         — evict all replicas of a workload
+//   skr8tr rollout <manifest.skr8tr>  — rolling zero-downtime update
+//   skr8tr status                     — show live nodes and placed workloads
+//   skr8tr nodes                      — show live node metrics
+//   skr8tr list                       — show all running workloads
+//   skr8tr lookup  <service>          — resolve a service name via the Tower
+//   skr8tr logs    <app>              — fetch stdout/stderr ring buffer
+//   skr8tr ping                       — ping Conductor and Tower
 //
 // Auth:
 //   Mutating commands (up, down) are ML-DSA-65 signed when --key is provided.
@@ -159,6 +160,11 @@ enum Commands {
     Down {
         /// App name as declared in the manifest
         app: String,
+    },
+    /// Rolling zero-downtime update — launch new replicas, drain old ones
+    Rollout {
+        /// Path to the updated .skr8tr manifest file
+        manifest: String,
     },
     /// Show live nodes and all running workload placements
     Status,
@@ -420,6 +426,31 @@ fn cmd_logs(cli: &Cli, app: &str, node_override: Option<&str>) {
     }
 }
 
+fn cmd_rollout(cli: &Cli, manifest: &str) {
+    let path = std::fs::canonicalize(manifest)
+        .unwrap_or_else(|_| std::path::PathBuf::from(manifest));
+    let path_str = path.to_string_lossy();
+    let raw = format!("ROLLOUT|{path_str}");
+
+    let cmd = match maybe_sign(&raw, &cli.key) {
+        Some(c) => c,
+        None => return,
+    };
+
+    print!("  rolling out {}... ", path_str);
+    match udp_send(&cli.conductor, 7771, &cmd, cli.timeout_ms) {
+        Ok(r) if r.starts_with("OK|ROLLOUT|") => {
+            let parts: Vec<&str> = r.splitn(3, '|').collect();
+            let app = parts.get(2).unwrap_or(&"?");
+            println!("ok");
+            println!("  app     {app}");
+            println!("  status  new replicas launching, old replicas draining (8s settle)");
+        }
+        Ok(r)  => println!("error\n  {r}"),
+        Err(e) => println!("error\n  {e}"),
+    }
+}
+
 fn cmd_ping(cli: &Cli) {
     print!("  conductor ({}:7771)... ", cli.conductor);
     match udp_send(&cli.conductor, 7771, "PING", cli.timeout_ms) {
@@ -444,13 +475,14 @@ fn main() {
     let cli = Cli::parse();
 
     match &cli.command {
-        Commands::Up     { manifest } => cmd_up(&cli, manifest),
-        Commands::Down   { app }      => cmd_down(&cli, app),
-        Commands::Status              => cmd_status(&cli),
-        Commands::Nodes               => cmd_nodes(&cli),
-        Commands::List                => cmd_list(&cli),
-        Commands::Lookup { service }  => cmd_lookup(&cli, service),
-        Commands::Ping                => cmd_ping(&cli),
-        Commands::Logs { app, node }  => cmd_logs(&cli, app, node.as_deref()),
+        Commands::Up      { manifest } => cmd_up(&cli, manifest),
+        Commands::Down    { app }      => cmd_down(&cli, app),
+        Commands::Rollout { manifest } => cmd_rollout(&cli, manifest),
+        Commands::Status               => cmd_status(&cli),
+        Commands::Nodes                => cmd_nodes(&cli),
+        Commands::List                 => cmd_list(&cli),
+        Commands::Lookup  { service }  => cmd_lookup(&cli, service),
+        Commands::Ping                 => cmd_ping(&cli),
+        Commands::Logs { app, node }   => cmd_logs(&cli, app, node.as_deref()),
     }
 }

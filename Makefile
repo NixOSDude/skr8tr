@@ -26,6 +26,7 @@ all: $(BIN) \
      $(BIN)/skr8tr_sched \
      $(BIN)/skr8tr_reg \
      $(BIN)/skr8tr_serve \
+     $(BIN)/skr8tr_ingress \
      $(BIN)/skrtrkey
 
 $(BIN):
@@ -43,6 +44,9 @@ $(BIN)/skr8tr_reg: $(SRC)/daemon/skr8tr_reg.c $(SRC)/core/fabric.c
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 $(BIN)/skr8tr_serve: $(SRC)/server/skr8tr_serve.c
+	$(CC) $(CFLAGS) $^ -o $@ -lpthread
+
+$(BIN)/skr8tr_ingress: $(SRC)/daemon/skr8tr_ingress.c $(SRC)/core/fabric.c
 	$(CC) $(CFLAGS) $^ -o $@ -lpthread
 
 $(BIN)/skrtrkey: $(SRC)/tools/skrtrkey.c $(SRC)/core/skrauth.c
