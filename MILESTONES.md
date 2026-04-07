@@ -615,3 +615,48 @@ make clean && make ENTERPRISE=1  # 9 enterprise binaries, zero warnings
 make clean && make             # 7 OSS binaries, zero warnings
 make clean && make ENTERPRISE=1  # 9 enterprise binaries, zero warnings
 ```
+
+---
+
+## 2026-04-07 — Phase 4B/4C: GitHub Emergency Cleanup + Blog Law Enforcement
+
+### Emergency: Enterprise Code Stripped from GitHub History
+- Discovered `src/enterprise/`, `enterprise-flake.nix`, `shell.nix`, `agent/`, `CLAUDE.md`
+  were publicly visible on GitHub — all enterprise paid features exposed
+- Force-rewrote GitHub history via git-filter-repo temp clone protocol
+- Enterprise code confirmed absent from GitHub; 0 clones/views in prior 14 days
+- `github` remote permanently removed from local `.git` — direct push physically impossible
+- Root `.gitignore` updated to document enterprise paths (belt + suspenders)
+- `src/enterprise/.gitignore` (`*`) blocks new untracked enterprise files from accidental staging
+- `ENTERPRISE_LAWS.md` added to `src/enterprise/` — isolation law documentation
+
+### OSS / Enterprise Feature Delineation Finalized
+- `flake.nix` — OSS only: daemons + CLI, no agent/onnxruntime/nghttp2
+- `enterprise-flake.nix` — all OSS + enterprise modules + agent + nghttp2
+- `skr8tr_ingress.c` — `#ifdef ENTERPRISE` guards on HTTP/2 / ALPN / nghttp2
+- Makefile — `INGRESS_LDFLAGS` conditional on `ENTERPRISE=1`
+- README.md — OSS features only; single enterprise callout → skr8tr.online/#enterprise
+- OPERATIONS.md — enterprise CLI sections replaced with link to website
+- `docs/index.html` — Auto-Scaling moved to enterprise section; false OSS claims removed
+
+### Federation Laws Updated
+- Law 18: Website/blog may describe enterprise features, show CLI usage, manifests.
+  NEVER expose `.c`/`.h`/`.rs` implementation code from `src/enterprise/` or `agent/`
+- Law 19: Website is GitHub Pages from `docs/` — NO VPS. Deploy = GitHub Push Protocol.
+
+### Blog Audit: C Source Code Removed
+- `sovereign-audit-chain-hipaa-compliant.html` — all `skr8tr_audit.c` enterprise code stripped
+- `post-quantum-auth-no-passwords.html` — `skrauth_sign`/`skrauth_verify` bodies replaced with prose
+- `http-ingress-in-320-lines-of-c.html` — `route_match`/`tower_lookup`/`proxy_forward` replaced
+- `rolling-updates-without-readiness-probes.html` — `rollout_thread`/`NodeEntry` replaced;
+  "What We Have Not Done" section removed per Captain's request
+- Note: OSS code (skrauth.c, skr8tr_ingress.c, skr8tr_sched.c) was stripped too — can restore
+  those posts if Captain wants the OSS code blocks back (they are safe to publish)
+
+### GitHub Push Verified Live
+- All blog changes force-pushed via filter-repo temp clone
+- GitHub Pages CDN propagation confirmed — Captain verified site updated
+
+### Next Priority
+- Optional: restore OSS code snippets to 3 non-audit blog posts if Captain wants
+- Session state chart (OSS vs enterprise completion) — pending from earlier request
