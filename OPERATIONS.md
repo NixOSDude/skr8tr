@@ -17,16 +17,23 @@ No Docker. No YAML. No Kubernetes. Bare processes on bare machines.
 8. [Auto-Scaling](#8-auto-scaling)
 9. [Health Checks](#9-health-checks)
 10. [Service Registry](#10-service-registry)
-11. [Logs](#11-logs)
-12. [Troubleshooting](#12-troubleshooting)
-13. [Port Map](#13-port-map)
+11. [HTTP Ingress](#11-http-ingress)
+12. [Rolling Updates](#12-rolling-updates)
+13. [Logs](#13-logs)
+14. [Troubleshooting](#14-troubleshooting)
+15. [Port Map](#15-port-map)
 
 ---
 
 ## 1. Architecture Overview
 
 ```
-┌─────────────┐       UDP 7771        ┌─────────────────┐
+                                    ┌─────────────────────┐
+  Internet / LB ──────────────────▶│  skr8tr_ingress      │  HTTP reverse proxy
+                                    │  (TCP 80)            │  longest-prefix routing
+                                    └──────────┬──────────┘
+                                               │ Tower LOOKUP (UDP 7772)
+┌─────────────┐       UDP 7771        ┌────────▼────────┐
 │  skr8tr CLI │ ──────────────────── ▶│  skr8tr_sched   │  The Conductor
 │  (Rust)     │◀──────────────────── │  (UDP 7771)     │  Masterless scheduler
 └─────────────┘                       └────────┬────────┘
@@ -38,19 +45,20 @@ No Docker. No YAML. No Kubernetes. Bare processes on bare machines.
                                                │ REGISTER via UDP 7772
                                     ┌──────────▼──────────┐
                                     │   skr8tr_reg         │  The Tower
-                                    │   (UDP 7772)         │  Service registry
+                                    │   (UDP 7772)         │  Service discovery
                                     └─────────────────────┘
 ```
 
 **Components:**
 
-| Binary          | Role                                   | Port(s)      |
-|-----------------|----------------------------------------|--------------|
-| `skr8tr_node`   | Fleet node — launches and monitors workloads | 7770 (mesh), 7775 (cmd) |
-| `skr8tr_sched`  | Conductor — schedules, places, scales replicas | 7771 |
-| `skr8tr_reg`    | Tower — service discovery registry     | 7772         |
-| `skr8tr_serve`  | Static file server (optional per-workload) | configurable |
-| `skr8tr` (CLI)  | Operator interface                     | —            |
+| Binary             | Role                                        | Port(s)              |
+|--------------------|---------------------------------------------|----------------------|
+| `skr8tr_node`      | Fleet node — launches and monitors workloads | 7770 (mesh), 7775 (cmd) |
+| `skr8tr_sched`     | Conductor — schedules, places, scales replicas | 7771              |
+| `skr8tr_reg`       | Tower — service discovery registry          | 7772                 |
+| `skr8tr_ingress`   | HTTP reverse proxy — routes to backend services | 80 (configurable) |
+| `skr8tr_serve`     | Static file server (optional per-workload)  | configurable         |
+| `skr8tr` (CLI)     | Operator interface                          | —                    |
 
 **Design laws:**
 - No master nodes. No SPOF. No leader election. Every node is a sovereign peer.
@@ -87,6 +95,8 @@ bin/skr8tr_node
 bin/skr8tr_sched
 bin/skr8tr_reg
 bin/skr8tr_serve
+bin/skr8tr_ingress
+bin/skrtrkey
 ```
 
 ### Build CLI (Rust)
@@ -374,6 +384,38 @@ Auto-deregisters from the Tower. Removes from Conductor placement table.
 
 ---
 
+### `skr8tr rollout <manifest>`
+
+Perform a zero-downtime rolling update of a running workload.
+
+```
+skr8tr rollout examples/api-server.skr8tr
+```
+
+```
+  rolling out /home/captain/skr8tr/examples/api-server.skr8tr... ok
+  app     api-server
+  status  new replicas launching, old replicas draining (8s settle)
+```
+
+The Conductor performs the rollout one replica at a time:
+1. Parse the updated manifest — determines new binary path, args, env
+2. For each existing replica:
+   - Launch a **new-generation** replica on the same or best node
+   - Wait 8 seconds (settle window — workload starts, health passes)
+   - Send `SIGTERM` to the old-generation replica, wait 2s, then `SIGKILL`
+3. After all replicas are replaced, increment the generation counter
+
+**Net effect:** At least N−1 replicas are always live during rollout (N = replica count).
+For single-replica apps there is a brief overlap, not a gap.
+
+Requires `--key` when the Conductor has PQC auth enabled:
+```bash
+skr8tr --key ~/.skr8tr/signing.sec rollout api-server.skr8tr
+```
+
+---
+
 ### `skr8tr status`
 
 Show live node metrics and all running workloads in one view.
@@ -497,9 +539,15 @@ Useful for scripting, debugging, and direct integration.
 |---------|----------|
 | `SUBMIT\|<absolute_manifest_path>` | `OK\|SUBMITTED\|<app>\|<node_id>` or `ERR\|<reason>` |
 | `EVICT\|<app_name>` | `OK\|EVICTED\|<app_name>` or `ERR\|<reason>` |
+| `ROLLOUT\|<absolute_manifest_path>` | `OK\|ROLLOUT\|<app>` or `ERR\|<reason>` |
 | `LIST` | `OK\|LIST\|<n>\|<app:node_id:pid,...>` |
 | `NODES` | `OK\|NODES\|<n>\|<node_id:ip:cpu%:ram_mb,...>` |
 | `PING` | `OK\|PONG\|conductor` |
+
+SUBMIT, EVICT, and ROLLOUT require a valid ML-DSA-65 signature when the Conductor
+has `--pubkey` set. See [PQC Auth](#pqc-auth) in the starting stack section.
+
+Signed wire format: `<cmd>|<unix_ts>|<6618-hex-char-ml-dsa-65-sig>`
 
 **Example — send raw UDP (bash /dev/udp):**
 ```bash
@@ -679,7 +727,113 @@ With 3 replicas of `api-server`, three successive lookups return `.51`, `.52`, `
 
 ---
 
-## 11. Logs
+## 11. HTTP Ingress
+
+`skr8tr_ingress` is an HTTP/1.1 reverse proxy that sits in front of your workload
+mesh. It resolves backends dynamically via the Tower — no static nginx config.
+
+### Starting the ingress
+
+```bash
+# Single route: all traffic → api-server
+nohup bin/skr8tr_ingress \
+  --listen 80 \
+  --tower 127.0.0.1 \
+  --route /:api-server \
+  > /tmp/ingress.log 2>&1 &
+
+# Multiple routes (longest prefix wins):
+nohup bin/skr8tr_ingress \
+  --listen 80 \
+  --tower 127.0.0.1 \
+  --route /api:api-service \
+  --route /static:static-site \
+  --route /:frontend \
+  > /tmp/ingress.log 2>&1 &
+```
+
+### Route matching
+
+Routes are sorted by prefix length (descending). The longest matching prefix wins:
+
+| Request path    | Route table                        | Matched backend |
+|-----------------|------------------------------------|-----------------|
+| `/api/users`    | `/api`, `/`                        | `api-service`   |
+| `/static/a.js`  | `/api`, `/static`, `/`             | `static-site`   |
+| `/`             | `/api`, `/static`, `/`             | `frontend`      |
+| `/unknown`      | `/api` only                        | `404 Not Found` |
+
+### Backend resolution
+
+For each request the ingress:
+1. Matches the route prefix → service name
+2. Sends `LOOKUP|<service>` to the Tower (UDP 7772)
+3. Tower returns `OK|LOOKUP|<name>|<ip>|<port>` (round-robin across replicas)
+4. Ingress connects to `<ip>:<port>`, forwards request, proxies response
+5. On backend failure: retries Tower lookup up to 3 times before returning `503`
+
+The Tower's round-robin means each request can land on a different replica —
+built-in load balancing with no configuration.
+
+### Headers injected
+
+```
+X-Forwarded-For: <client_ip>
+X-Real-IP: <client_ip>
+```
+
+### TLS
+
+The ingress speaks plain HTTP internally. TLS termination belongs at the cloud
+load balancer (AWS ALB, GCP HTTPS LB, Cloudflare Proxy). This is the standard
+production pattern — terminate at the edge, run HTTP internally.
+
+### Flags
+
+```
+--listen <port>          TCP port to accept connections on  (default: 80)
+--tower  <host>          Tower hostname or IP               (default: 127.0.0.1)
+--route  <prefix:svc>    Route rule. Repeat for multiple routes.
+--workers <n>            Max concurrent connections         (default: 64)
+```
+
+---
+
+## 12. Rolling Updates
+
+Rolling updates replace replicas one at a time with no full downtime gap.
+
+```bash
+# After updating your binary / manifest:
+skr8tr --key ~/.skr8tr/signing.sec rollout api-server.skr8tr
+```
+
+**What happens inside the Conductor:**
+1. Reads updated manifest — new `exec`, `args`, `env` fields
+2. Increments the internal generation counter for the workload
+3. Spawns a background thread (one per rollout):
+   - For each current (old-gen) replica:
+     - Launch new-gen replica (LAUNCH to best node)
+     - Wait `ROLLOUT_WAIT_S = 8` seconds
+     - KILL old-gen replica
+4. Returns `OK|ROLLOUT|<app>` immediately — rollout runs asynchronously
+
+**During rollout:** `skr8tr list` shows both old-gen and new-gen replicas while
+the settle window is active.
+
+**Port collision safety:** If the old port is still bound when the new replica
+starts, the Conductor selects a node that does not already have that port claimed.
+
+**Abort / emergency:** To stop a misbehaving rollout, evict the workload entirely
+and resubmit the previous manifest version:
+```bash
+skr8tr down api-server
+skr8tr up api-server-v1.skr8tr
+```
+
+---
+
+## 13. Logs
 
 Each managed process has a per-process ring buffer: last 200 lines of combined
 stdout/stderr. The ring is stored in-process on the node — no disk writes.
@@ -704,7 +858,7 @@ For durable logs, have your workload write to a file or push to a log aggregator
 
 ---
 
-## 12. Troubleshooting
+## 14. Troubleshooting
 
 ### Workload shows `pending` in `skr8tr list`
 
@@ -781,15 +935,16 @@ skr8tr --conductor 192.168.68.51 ping
 
 ---
 
-## 13. Port Map
+## 15. Port Map
 
-| Port | Protocol | Component    | Purpose                                      |
-|------|----------|--------------|----------------------------------------------|
-| 7770 | UDP      | All nodes    | Heartbeat mesh — `HEARTBEAT\|id\|cpu\|ram` broadcasts |
-| 7771 | UDP      | Conductor    | Operator commands: SUBMIT, EVICT, LIST, NODES |
-| 7772 | UDP      | Tower        | Service registry: REGISTER, LOOKUP, LIST     |
-| 7774 | TCP      | skr8tr_serve | Static file server (port is configurable)    |
-| 7775 | UDP      | Fleet nodes  | Node commands: LAUNCH, KILL, STATUS, LOGS    |
+| Port | Protocol | Component        | Purpose                                            |
+|------|----------|------------------|----------------------------------------------------|
+| 80   | TCP      | skr8tr_ingress   | HTTP ingress reverse proxy (configurable)          |
+| 7770 | UDP      | All nodes        | Heartbeat mesh — `HEARTBEAT\|id\|cpu\|ram` broadcasts |
+| 7771 | UDP      | Conductor        | Operator commands: SUBMIT, EVICT, ROLLOUT, LIST    |
+| 7772 | UDP      | Tower            | Service registry: REGISTER, LOOKUP, LIST           |
+| 7774 | TCP      | skr8tr_serve     | Static file server (port is configurable)          |
+| 7775 | UDP      | Fleet nodes      | Node commands: LAUNCH, KILL, STATUS, LOGS          |
 
 All ports are configurable at binary startup. The defaults above are the mesh
 convention — change them consistently across all daemons if you need different ports.

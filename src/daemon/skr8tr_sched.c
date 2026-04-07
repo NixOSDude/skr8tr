@@ -85,6 +85,9 @@ typedef struct {
     int      active;
     int      high_cpu_cycles;   /* consecutive cycles above cpu_above */
     int      low_cpu_cycles;    /* consecutive cycles below cpu_below */
+    /* port collision tracking — prevents two apps binding the same port */
+    int      used_ports[64];
+    int      used_port_count;
 } NodeEntry;
 
 static NodeEntry         g_nodes[MAX_NODES];
@@ -98,6 +101,8 @@ typedef struct {
     char  app_name[128];
     char  node_id[33];
     int   pid;
+    int   port;        /* port claimed on the node (0 = none) */
+    int   generation;  /* rollout generation; old gens get killed during rollout */
     int   active;
 } Placement;
 
@@ -112,6 +117,8 @@ typedef struct {
     Placement       replicas[MAX_REPLICAS];
     int             replica_count;
     int             active;
+    int             current_gen;     /* rollout generation counter */
+    int             rolling;         /* 1 while a rollout is in progress */
 } Workload;
 
 static Workload          g_workloads[MAX_WORKLOADS];
@@ -123,8 +130,164 @@ static pthread_mutex_t   g_workloads_mu = PTHREAD_MUTEX_INITIALIZER;
 
 static int g_state_loading = 0;  /* suppresses state_save during state_load replay */
 
-/* Forward declaration — defined later in this file */
-static int submit_workload(const char* manifest_path, char* resp, size_t resp_len);
+/* Forward declarations */
+static int        submit_workload(const char* manifest_path, char* resp, size_t resp_len);
+static NodeEntry* node_find(const char* node_id);
+static NodeEntry* node_least_loaded_for_port(int port);
+static void       node_port_release(NodeEntry* n, int port);
+static int        launch_replica(Workload* wl, NodeEntry* node);
+
+/* -------------------------------------------------------------------------
+ * Rolling update — zero-downtime replacement of all replicas
+ *
+ * ROLLOUT|<manifest_path>
+ *   For each running replica:
+ *     1. Launch 1 new replica with new spec (port-aware placement)
+ *     2. Wait ROLLOUT_WAIT_S seconds (health settle time)
+ *     3. Send KILL to the oldest old-generation replica
+ * Runs in a dedicated thread so the main loop stays responsive.
+ * ---------------------------------------------------------------------- */
+
+#define ROLLOUT_WAIT_S  8   /* seconds to wait after launch before killing old */
+
+typedef struct {
+    char manifest_path[512];
+} RolloutArg;
+
+static void* rollout_thread(void* arg) {
+    RolloutArg* ra = arg;
+    char manifest_path[512];
+    snprintf(manifest_path, sizeof(manifest_path), "%s", ra->manifest_path);
+    free(ra);
+
+    char err[512] = {0};
+    SkrProc* procs = skrmaker_parse(manifest_path, err, sizeof(err));
+    if (!procs) {
+        fprintf(stderr, "[sched] rollout parse failed: %s\n", err);
+        return NULL;
+    }
+
+    for (SkrProc* sp = procs; sp; sp = sp->next) {
+        pthread_mutex_lock(&g_workloads_mu);
+
+        /* Find the workload */
+        Workload* wl = NULL;
+        for (int i = 0; i < MAX_WORKLOADS; i++) {
+            if (g_workloads[i].active &&
+                !strcmp(g_workloads[i].app_name, sp->name)) {
+                wl = &g_workloads[i];
+                break;
+            }
+        }
+
+        if (!wl) {
+            pthread_mutex_unlock(&g_workloads_mu);
+            fprintf(stderr, "[sched] rollout: app '%s' not found — "
+                    "use 'up' first\n", sp->name);
+            continue;
+        }
+
+        /* Bump generation and update spec */
+        int old_gen = wl->current_gen;
+        wl->current_gen++;
+        wl->spec        = *sp;
+        wl->rolling     = 1;
+        int old_desired = sp->replicas > 0 ? sp->replicas : 1;
+        snprintf(wl->manifest_path, sizeof(wl->manifest_path), "%s",
+                 manifest_path);
+
+        printf("[sched] rollout: %s  gen %d → %d  replicas=%d\n",
+               sp->name, old_gen, wl->current_gen, old_desired);
+
+        pthread_mutex_unlock(&g_workloads_mu);
+
+        /* Rolling: for each old-gen replica, launch one new then kill the old */
+        for (int r = 0; r < old_desired; r++) {
+            /* Launch one new-gen replica */
+            pthread_mutex_lock(&g_nodes_mu);
+            pthread_mutex_lock(&g_workloads_mu);
+            NodeEntry* nd = node_least_loaded_for_port(sp->port);
+            if (nd) {
+                launch_replica(wl, nd);
+            } else {
+                fprintf(stderr, "[sched] rollout: no eligible node for "
+                        "replica %d of %s\n", r+1, sp->name);
+            }
+            pthread_mutex_unlock(&g_workloads_mu);
+            pthread_mutex_unlock(&g_nodes_mu);
+
+            /* Wait for the new replica to settle */
+            sleep(ROLLOUT_WAIT_S);
+
+            /* Kill the oldest old-gen replica */
+            pthread_mutex_lock(&g_nodes_mu);
+            pthread_mutex_lock(&g_workloads_mu);
+            for (int i = 0; i < MAX_REPLICAS; i++) {
+                Placement* pl = &wl->replicas[i];
+                if (!pl->active || pl->generation != old_gen) continue;
+
+                NodeEntry* kill_nd = node_find(pl->node_id);
+                if (kill_nd) {
+                    char cmd[256];
+                    snprintf(cmd, sizeof(cmd), "KILL|%.127s", sp->name);
+                    int ks = fabric_bind(0);
+                    if (ks >= 0) {
+                        fabric_send(ks, kill_nd->ip, NODE_CMD_PORT,
+                                    cmd, strlen(cmd));
+                        close(ks);
+                    }
+                    if (pl->port > 0)
+                        node_port_release(kill_nd, pl->port);
+                }
+                pl->active = 0;
+                wl->replica_count--;
+                printf("[sched] rollout: killed old gen replica %d of %s\n",
+                       r+1, sp->name);
+                break;
+            }
+            pthread_mutex_unlock(&g_workloads_mu);
+            pthread_mutex_unlock(&g_nodes_mu);
+        }
+
+        pthread_mutex_lock(&g_workloads_mu);
+        wl->rolling = 0;
+        pthread_mutex_unlock(&g_workloads_mu);
+
+        printf("[sched] rollout: %s complete\n", sp->name);
+    }
+
+    skrmaker_free(procs);
+    return NULL;
+}
+
+static void rollout_workload(const char* manifest_path,
+                              char* resp, size_t resp_len) {
+    RolloutArg* ra = malloc(sizeof(RolloutArg));
+    if (!ra) { snprintf(resp, resp_len, "ERR|out of memory"); return; }
+    snprintf(ra->manifest_path, sizeof(ra->manifest_path), "%s", manifest_path);
+
+    pthread_t tid;
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+    if (pthread_create(&tid, &attr, rollout_thread, ra) != 0) {
+        free(ra);
+        snprintf(resp, resp_len, "ERR|rollout thread failed");
+        pthread_attr_destroy(&attr);
+        return;
+    }
+    pthread_attr_destroy(&attr);
+
+    /* Extract app name from manifest for the response */
+    char parse_err[128] = {0};
+    SkrProc* procs = skrmaker_parse(manifest_path, parse_err, sizeof(parse_err));
+    if (procs) {
+        snprintf(resp, resp_len, "OK|ROLLOUT|%s|rolling", procs->name);
+        skrmaker_free(procs);
+    } else {
+        snprintf(resp, resp_len, "OK|ROLLOUT|unknown|rolling");
+    }
+}
 
 /* Write all active workload manifest paths to the state file.
  * Must be called OUTSIDE any held mutex — acquires g_workloads_mu internally. */
@@ -189,14 +352,48 @@ static NodeEntry* node_upsert(const char* node_id, const char* ip) {
     return free_slot;
 }
 
-/* Pick the least-loaded live node (lowest cpu_pct, breaking ties by ram_free_mb).
- * Returns NULL if no live nodes. */
-static NodeEntry* node_least_loaded(void) {
+/* Find a live node by node_id. Must be called with g_nodes_mu held. */
+static NodeEntry* node_find(const char* node_id) {
+    for (int i = 0; i < MAX_NODES; i++)
+        if (g_nodes[i].active && !strcmp(g_nodes[i].node_id, node_id))
+            return &g_nodes[i];
+    return NULL;
+}
+
+/* Port tracking helpers — must be called with g_nodes_mu held. */
+static int node_port_in_use(const NodeEntry* n, int port) {
+    if (port <= 0) return 0;
+    for (int i = 0; i < n->used_port_count; i++)
+        if (n->used_ports[i] == port) return 1;
+    return 0;
+}
+
+static void node_port_claim(NodeEntry* n, int port) {
+    if (port <= 0 || node_port_in_use(n, port)) return;
+    if (n->used_port_count < 64)
+        n->used_ports[n->used_port_count++] = port;
+}
+
+static void node_port_release(NodeEntry* n, int port) {
+    if (port <= 0) return;
+    for (int i = 0; i < n->used_port_count; i++) {
+        if (n->used_ports[i] == port) {
+            n->used_ports[i] = n->used_ports[--n->used_port_count];
+            return;
+        }
+    }
+}
+
+/* Pick the least-loaded live node that does NOT already have `port` bound.
+ * port=0 means no port constraint (any node eligible).
+ * Returns NULL if no eligible nodes. Must be called with g_nodes_mu held. */
+static NodeEntry* node_least_loaded_for_port(int port) {
     time_t    now  = time(NULL);
     NodeEntry* best = NULL;
     for (int i = 0; i < MAX_NODES; i++) {
         NodeEntry* n = &g_nodes[i];
         if (!n->active || (now - n->last_seen) >= NODE_EXPIRY_S) continue;
+        if (port > 0 && node_port_in_use(n, port)) continue;
         if (!best ||
             n->cpu_pct < best->cpu_pct ||
             (n->cpu_pct == best->cpu_pct && n->ram_free_mb > best->ram_free_mb))
@@ -204,6 +401,7 @@ static NodeEntry* node_least_loaded(void) {
     }
     return best;
 }
+
 
 /* -------------------------------------------------------------------------
  * Placement helpers
@@ -311,9 +509,15 @@ static int launch_replica(Workload* wl, NodeEntry* node) {
     if (!pl) { fprintf(stderr, "[sched] placement table full\n"); return 0; }
     snprintf(pl->app_name, sizeof(pl->app_name), "%s", sp->name);
     snprintf(pl->node_id,  sizeof(pl->node_id),  "%s", node->node_id);
-    pl->pid    = (int)real_pid;
-    pl->active = 1;
+    pl->pid        = (int)real_pid;
+    pl->port       = sp->port;
+    pl->generation = wl->current_gen;
+    pl->active     = 1;
     wl->replica_count++;
+
+    /* Claim the port on this node — prevents collision for future placements */
+    if (sp->port > 0)
+        node_port_claim(node, sp->port);
 
     printf("[sched] launched replica: %s → node %s (%s) pid=%d\n",
            sp->name, node->node_id, node->ip, (int)real_pid);
@@ -373,10 +577,11 @@ static int submit_workload(const char* manifest_path,
         char first_node_id[33] = {0};
 
         for (int r = have; r < desired; r++) {
-            NodeEntry* node = node_least_loaded();
+            NodeEntry* node = node_least_loaded_for_port(sp->port);
             if (!node) {
-                printf("[sched] WARNING: no live nodes available for %s\n",
-                       sp->name);
+                printf("[sched] WARNING: no eligible nodes for %s"
+                       " (port %d may already be in use on all nodes)\n",
+                       sp->name, sp->port);
                 break;
             }
             if (launch_replica(wl, node)) {
@@ -428,6 +633,9 @@ static void evict_workload(const char* app_name,
                     snprintf(cmd, sizeof(cmd), "KILL|%.127s", app_name);
                     fabric_send(send_sock, g_nodes[n].ip, NODE_CMD_PORT,
                                 cmd, strlen(cmd));
+                    /* Release port claim */
+                    if (pl->port > 0)
+                        node_port_release(&g_nodes[n], pl->port);
                     break;
                 }
             }
@@ -473,6 +681,7 @@ static void* rebalancer_thread(void* arg) {
                 printf("[sched] node expired: %s (%s)\n",
                        nd->node_id, nd->ip);
                 placement_evict_node(nd->node_id);
+                nd->used_port_count = 0;   /* all ports freed with the node */
                 nd->active = 0;
             }
         }
@@ -517,7 +726,7 @@ static void* rebalancer_thread(void* arg) {
                         /* Scale up */
                         if (nd->high_cpu_cycles >= SCALE_UP_CYCLES &&
                             have < scale_max) {
-                            NodeEntry* target = node_least_loaded();
+                            NodeEntry* target = node_least_loaded_for_port(sp->port);
                             if (target && target != nd) {
                                 printf("[sched] scale-up: %s (cpu %d%% > %d%%)\n",
                                        sp->name, nd->cpu_pct, cpu_above);
@@ -548,7 +757,7 @@ static void* rebalancer_thread(void* arg) {
             /* Reconcile: relaunch any under-replicated workloads */
             have = placement_count(wl);
             while (have < desired) {
-                NodeEntry* node = node_least_loaded();
+                NodeEntry* node = node_least_loaded_for_port(sp->port);
                 if (!node) break;
                 printf("[sched] reconcile: relaunching replica %d/%d of %s\n",
                        have + 1, desired, sp->name);
@@ -578,8 +787,9 @@ static void handle_command(const char* cmd, const FabricAddr* src,
     const char *effective_cmd = cmd;
 
     if (g_auth_enabled) {
-        int needs_auth = (!strncmp(cmd, "SUBMIT|", 7) ||
-                          !strncmp(cmd, "EVICT|",  6));
+        int needs_auth = (!strncmp(cmd, "SUBMIT|",  7) ||
+                          !strncmp(cmd, "EVICT|",   6) ||
+                          !strncmp(cmd, "ROLLOUT|", 8));
         if (needs_auth) {
             if (skrauth_verify(cmd, g_pubkey_path,
                                bare_cmd, sizeof(bare_cmd)) != 0) {
@@ -603,6 +813,11 @@ static void handle_command(const char* cmd, const FabricAddr* src,
 
     if (!strncmp(effective_cmd, "EVICT|", 6)) {
         evict_workload(effective_cmd + 6, resp, resp_len);
+        return;
+    }
+
+    if (!strncmp(effective_cmd, "ROLLOUT|", 8)) {
+        rollout_workload(effective_cmd + 8, resp, resp_len);
         return;
     }
 
