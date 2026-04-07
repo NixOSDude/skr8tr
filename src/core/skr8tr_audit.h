@@ -59,8 +59,38 @@
  * skraudit_init — open/create the audit log file, write genesis entry.
  * Call once at Conductor startup.
  * path: override default log path, or NULL to use SKRAUDIT_LOG_PATH.
+ * Sets chmod 600 on the log file — access control hardening.
  */
 void skraudit_init(const char* path);
+
+/*
+ * skraudit_set_encryption — enable AES-256-GCM at-rest encryption.
+ *
+ * key_path: path to a 32-byte raw binary key file.  Generate with:
+ *             openssl rand -out ~/.skr8tr/audit.key 32
+ *             chmod 600 ~/.skr8tr/audit.key
+ *
+ * Each log entry is encrypted individually.  The hash chain still
+ * operates over plaintext so integrity verification works after
+ * decryption.  Covers HIPAA § 164.312(a)(2)(iv) — Encryption at Rest,
+ * PCI DSS 3.4 — Protect stored data.
+ *
+ * Must be called BEFORE skraudit_init() to encrypt the genesis entry.
+ * Returns 0 on success, -1 if the key file cannot be read.
+ */
+int skraudit_set_encryption(const char* key_path);
+
+/*
+ * skraudit_set_syslog — wire audit events to a syslog forwarder.
+ *
+ * Must be called AFTER skrsyslog_init().  Every subsequent
+ * skraudit_log() call will also call skrsyslog_send() with the
+ * appropriate RFC 5424 severity.
+ *
+ * Covers HIPAA § 164.312(b) centralised log collection,
+ * PCI DSS 10.5.3 — remote copy of audit logs.
+ */
+void skraudit_set_syslog(int enabled);
 
 /*
  * skraudit_log — append a cryptographically chained audit entry.

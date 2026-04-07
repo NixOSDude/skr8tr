@@ -36,6 +36,7 @@
 #include "../core/fabric.h"
 #include "../core/skrauth.h"
 #include "../core/skr8tr_audit.h"
+#include "../core/skr8tr_syslog.h"
 #include "../parser/skrmaker.h"
 
 #include <arpa/inet.h>
@@ -1251,17 +1252,50 @@ static void process_heartbeat(const char* msg, const FabricAddr* src) {
  * ---------------------------------------------------------------------- */
 
 int main(int argc, char* argv[]) {
-    /* Parse --pubkey <path> and --audit-log <path> */
-    const char* audit_path = NULL;
-    for (int i = 1; i < argc - 1; i++) {
-        if (!strcmp(argv[i], "--pubkey"))
-            snprintf(g_pubkey_path, sizeof(g_pubkey_path), "%s", argv[i + 1]);
-        if (!strcmp(argv[i], "--audit-log"))
-            audit_path = argv[i + 1];
+    /* Parse flags:
+     *   --pubkey     <path>   ML-DSA-65 public key for command authentication
+     *   --audit-log  <path>   override default audit log path
+     *   --audit-key  <path>   32-byte key file for AES-256-GCM at-rest encryption
+     *   --syslog-host <host>  syslog collector hostname/IP (UDP RFC 5426)
+     *   --syslog-port <port>  syslog collector port (default 514 / 6514 for TLS)
+     *   --syslog-tls          use TLS/TCP syslog (RFC 5425) instead of UDP
+     *   --syslog-ca  <path>   PEM CA cert for TLS peer verification
+     */
+    const char* audit_path    = NULL;
+    const char* audit_key     = NULL;
+    const char* syslog_host   = NULL;
+    int         syslog_port   = 0;
+    int         syslog_tls    = 0;
+    const char* syslog_ca     = NULL;
+
+    for (int i = 1; i < argc; i++) {
+        if (i < argc - 1) {
+            if (!strcmp(argv[i], "--pubkey"))
+                snprintf(g_pubkey_path, sizeof(g_pubkey_path), "%s", argv[i + 1]);
+            if (!strcmp(argv[i], "--audit-log"))  audit_path  = argv[i + 1];
+            if (!strcmp(argv[i], "--audit-key"))  audit_key   = argv[i + 1];
+            if (!strcmp(argv[i], "--syslog-host")) syslog_host = argv[i + 1];
+            if (!strcmp(argv[i], "--syslog-port")) syslog_port = atoi(argv[i + 1]);
+            if (!strcmp(argv[i], "--syslog-ca"))  syslog_ca   = argv[i + 1];
+        }
+        if (!strcmp(argv[i], "--syslog-tls")) syslog_tls = 1;
     }
+
+    /* Enable at-rest encryption BEFORE init so the genesis entry is encrypted */
+    if (audit_key)
+        skraudit_set_encryption(audit_key);
 
     /* Initialise cryptographic audit ledger */
     skraudit_init(audit_path);   /* NULL → /var/log/skr8tr_audit.log */
+
+    /* Initialise syslog forwarder — RFC 5426 (UDP) or RFC 5425 (TLS/TCP) */
+    if (syslog_host) {
+        if (skrsyslog_init(syslog_host, syslog_port, syslog_tls, syslog_ca) == 0)
+            skraudit_set_syslog(1);
+        else
+            fprintf(stderr, "[sched] WARNING: syslog init failed — "
+                    "events will not be forwarded to SIEM\n");
+    }
 
     printf("[sched] Skr8tr Conductor starting...\n");
 
