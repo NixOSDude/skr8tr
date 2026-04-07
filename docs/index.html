@@ -498,11 +498,13 @@
   <a class="bs-gold" href="/blog/rolling-updates-without-readiness-probes.html">Rolling Updates Without ReadinessProbes</a>
   <span class="sep">|</span>
   <a class="bs-purple" href="/blog/sovereign-market-9-microservices-no-kubernetes.html">9 Microservices. 3 Nodes. Zero Kubernetes.</a>
+  <span class="sep">|</span>
+  <a class="bs-gold" href="/blog/sovereign-audit-chain-hipaa-compliant.html">HIPAA-Compliant Audit Chain in 600 Lines of C</a>
 </div>
 
 <!-- HERO -->
 <div class="hero">
-  <div class="hero-badge">&#x26A1; OPEN SOURCE &nbsp;&bull;&nbsp; C23 + RUST &nbsp;&bull;&nbsp; POST-QUANTUM AUTH</div>
+  <div class="hero-badge">&#x26A1; OPEN SOURCE &nbsp;&bull;&nbsp; C23 + RUST &nbsp;&bull;&nbsp; POST-QUANTUM AUTH &nbsp;&bull;&nbsp; HIPAA / PCI DSS READY</div>
   <img src="/skr8tr.svg" alt="skr8tr" width="480" height="119" style="max-width:min(480px,85vw);height:auto;margin-bottom:1.2rem;" />
   <p class="hero-tagline">
     The <strong>sovereign workload orchestrator.</strong><br>
@@ -567,6 +569,10 @@
       <div class="stat-num">C23</div>
       <div class="stat-label">No GC, no JVM, no runtime bloat</div>
     </div>
+    <div class="stat-card">
+      <div class="stat-num" style="font-size:1.1rem;color:var(--gold);">HIPAA</div>
+      <div class="stat-label">+ HITRUST · PCI DSS · NIST · SOC 2 ready</div>
+    </div>
   </div>
 </section>
 
@@ -591,6 +597,8 @@
       <div class="comp-row"><span class="comp-icon" style="color:var(--red)">&#x2717;</span> nginx-ingress as a separate Helm chart just to route HTTP</div>
       <div class="comp-row"><span class="comp-icon" style="color:var(--red)">&#x2717;</span> Rollouts require readinessProbes, PodDisruptionBudgets, DeploymentStrategies</div>
       <div class="comp-row"><span class="comp-icon" style="color:var(--red)">&#x2717;</span> Leader election, Raft consensus, SPOF etcd cluster</div>
+      <div class="comp-row"><span class="comp-icon" style="color:var(--red)">&#x2717;</span> No built-in audit trail — requires separate SIEM, Falco, or audit webhook plumbing</div>
+      <div class="comp-row"><span class="comp-icon" style="color:var(--red)">&#x2717;</span> Bearer tokens are base64 secrets — kubeconfig breaches grant full cluster access</div>
     </div>
     <div class="comp-card us">
       <h3>&#x2713; &nbsp;Skr8tr</h3>
@@ -601,6 +609,10 @@
       <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> Built-in HTTP ingress — longest-prefix routing, Tower discovery</div>
       <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> <code>skr8tr rollout app.skr8tr</code> — one command, zero downtime</div>
       <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> Masterless mesh — no etcd, no leader, no SPOF</div>
+      <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> Prometheus metrics on every node (port 9100) — no metrics-server required</div>
+      <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> cgroups v2 resource limits built in — memory.max + cpu.max per workload</div>
+      <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> WASM + full VM (QEMU / Firecracker) alongside binary workloads on the same cluster</div>
+      <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> SHA-256 audit chain + AES-256-GCM + SIEM syslog — HIPAA/HITRUST/PCI DSS built in</div>
     </div>
   </div>
 </section>
@@ -658,6 +670,61 @@
       <h3>Bare Metal Speed</h3>
       <p>No container runtime. No OCI image pull. Fork + exec. Your binary starts in milliseconds, not seconds. Zero copy overhead on the data path.</p>
     </div>
+    <div class="feat-card">
+      <div class="feat-icon">&#x1F512;</div>
+      <h3>TLS/HTTPS Ingress</h3>
+      <p>The built-in ingress terminates TLS natively — pass <code>--tls-cert</code> and <code>--tls-key</code> to flip from HTTP to HTTPS. Backend connections stay plain. No Certbot config, no nginx TLS blocks.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">&#x1F4CA;</div>
+      <h3>Prometheus Metrics</h3>
+      <p>Every node exposes <code>/metrics</code> on port 9100 in Prometheus text format — process count, CPU%, free RAM, health failure counts. Scrape with any standard Prometheus stack. Zero config.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">&#x1F9EE;</div>
+      <h3>cgroups v2 Resource Limits</h3>
+      <p>Declare <code>ram</code> and <code>cpu</code> in your manifest. The node writes <code>memory.max</code> and <code>cpu.max</code> into the workload's cgroup at launch. Hard enforcement, no escape hatch.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">&#x26D3;&#xFE0F;</div>
+      <h3>Secret Injection</h3>
+      <p>Declare secrets in a <code>secret {}</code> block. They are injected directly into the child process env after fork — never included in UDP wire commands, never written to logs, never visible to other processes.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">&#x1F4BE;</div>
+      <h3>Persistent Volumes</h3>
+      <p>Mount host paths as workload env vars via <code>volume {}</code>. The directory is auto-created if missing. The process sees <code>DATA_DIR=/data/myapp</code>. No PersistentVolumeClaim, no StorageClass.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">&#x267B;&#xFE0F;</div>
+      <h3>Restart Policy</h3>
+      <p><code>restart always</code> — node relaunches locally on any exit. <code>restart on-failure</code> — only on non-zero. <code>restart never</code> — Conductor rebalances cross-node. All three send DIED/RELAUNCHED to keep placement accurate.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">&#x23F3;</div>
+      <h3>Graceful Drain</h3>
+      <p>Set <code>drain 30s</code> in your manifest. On KILL, the node sends SIGTERM and waits the configured window before SIGKILL — giving your process time to flush queues, close DB connections, finish in-flight requests.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">&#x1F5A5;&#xFE0F;</div>
+      <h3>WASM + Full VM Workloads</h3>
+      <p>Declare <code>type wasm</code> to run a WASM module via wasmtime. Declare <code>type vm</code> with a <code>vm {}</code> block to launch a QEMU or Firecracker microVM. Binary, WASM, and VM workloads coexist on the same node fleet.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">&#x1F4E1;</div>
+      <h3>Remote Exec &amp; Dead Replica Detection</h3>
+      <p><code>skr8tr exec myapp "ls -la /data"</code> — the Conductor routes the shell command to the node hosting the app and returns stdout. Dead replicas are detected via instant SIGCHLD → DIED broadcast — no 15-second expiry wait.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">&#x1F4BE;</div>
+      <h3>Persistent Conductor State</h3>
+      <p>The Conductor writes its workload table to disk on every SUBMIT/EVICT. If the Conductor restarts, it replays the state file and re-establishes desired placement — zero operator intervention.</p>
+    </div>
+    <div class="feat-card" style="border-color:rgba(48,216,144,0.3);background:rgba(48,216,144,0.03);">
+      <div class="feat-icon">&#x1F9E0;</div>
+      <h3 style="color:var(--green)">Autonomous Self-Healing Mesh</h3>
+      <p>Dead replicas are detected instantly via <code>SIGCHLD → DIED</code> broadcast — no polling delay. Failed health probes kill and relaunch in-place. CPU autoscale triggers scale-up/down without operator input. Restart policies enforce recovery across node reboots. The cluster heals itself — continuously, without a human in the loop.</p>
+    </div>
     <div class="feat-card" style="border-color:rgba(240,176,32,0.3);background:rgba(240,176,32,0.04);">
       <div class="feat-icon">&#x1F4CB;</div>
       <h3 style="color:var(--gold)">Compliance-Ready Audit Ledger</h3>
@@ -677,29 +744,72 @@
 
   <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1.5rem;">
     <div>
-      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:0.6rem;font-family:var(--font-mono)">api-server.skr8tr</p>
+      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:0.6rem;font-family:var(--font-mono)">api-server.skr8tr — basic service</p>
       <div class="code-block">
 <span class="kw">app</span> <span class="val">api-server</span>
   <span class="kw">exec</span>     <span class="str">/usr/local/bin/myapi</span>
   <span class="kw">args</span>     <span class="str">--port 8080 --db postgres.internal</span>
   <span class="kw">port</span>     <span class="val">8080</span>
   <span class="kw">replicas</span> <span class="val">3</span>
+  <span class="kw">restart</span>  <span class="val">on-failure</span>
+  <span class="kw">drain</span>    <span class="val">30s</span>
+  <span class="kw">ram</span>      <span class="val">536870912</span>  <span class="comment"># 512 MB cgroups limit</span>
+  <span class="kw">cpu</span>      <span class="val">2</span>
   <span class="kw">health</span> {
-    <span class="kw">check</span>  <span class="str">GET /healthz 200</span>
+    <span class="kw">check</span>    <span class="str">GET /healthz 200</span>
+    <span class="kw">interval</span> <span class="val">10s</span>
+    <span class="kw">retries</span>  <span class="val">3</span>
   }</div>
     </div>
     <div>
-      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:0.6rem;font-family:var(--font-mono)">with auto-scaling</p>
+      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:0.6rem;font-family:var(--font-mono)">with secrets, volumes, and scaling</p>
       <div class="code-block">
 <span class="kw">app</span> <span class="val">api-server</span>
   <span class="kw">exec</span>     <span class="str">/usr/local/bin/myapi</span>
   <span class="kw">port</span>     <span class="val">8080</span>
   <span class="kw">replicas</span> <span class="val">2</span>
+  <span class="kw">secret</span> {
+    <span class="val">DB_PASSWORD</span>  <span class="str">hunter2</span>
+    <span class="val">API_KEY</span>      <span class="str">sk-abc123</span>
+  }
+  <span class="kw">volume</span> {
+    <span class="val">DATA_DIR</span>  <span class="str">/data/myapp</span>
+  }
   <span class="kw">scale</span> {
     <span class="kw">min</span>        <span class="val">1</span>
     <span class="kw">max</span>        <span class="val">8</span>
     <span class="kw">cpu-above</span>  <span class="val">80</span>
     <span class="kw">cpu-below</span>  <span class="val">20</span>
+  }</div>
+    </div>
+  </div>
+  <div style="margin-top:1.5rem;display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
+    <div>
+      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:0.6rem;font-family:var(--font-mono)">wasm workload</p>
+      <div class="code-block">
+<span class="kw">app</span> <span class="val">data-processor</span>
+  <span class="kw">type</span>     <span class="val">wasm</span>
+  <span class="kw">exec</span>     <span class="str">/opt/modules/processor.wasm</span>
+  <span class="kw">replicas</span> <span class="val">2</span>
+  <span class="kw">restart</span>  <span class="val">always</span>
+  <span class="kw">volume</span> {
+    <span class="val">INPUT_DIR</span>   <span class="str">/data/input</span>
+    <span class="val">OUTPUT_DIR</span>  <span class="str">/data/output</span>
+  }</div>
+    </div>
+    <div>
+      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:0.6rem;font-family:var(--font-mono)">firecracker microVM</p>
+      <div class="code-block">
+<span class="kw">app</span> <span class="val">isolated-worker</span>
+  <span class="kw">type</span>     <span class="val">vm</span>
+  <span class="kw">restart</span>  <span class="val">on-failure</span>
+  <span class="kw">vm</span> {
+    <span class="kw">hypervisor</span>  <span class="str">firecracker</span>
+    <span class="kw">kernel</span>      <span class="str">/opt/vmlinux</span>
+    <span class="kw">rootfs</span>      <span class="str">/opt/worker.ext4</span>
+    <span class="kw">vcpus</span>       <span class="val">2</span>
+    <span class="kw">memory</span>      <span class="val">512</span>
+    <span class="kw">net</span>         <span class="str">user</span>
   }</div>
     </div>
   </div>
@@ -728,14 +838,17 @@
                                        │ LAUNCH via UDP :7775
                               <span class="org">┌────────▼────────┐</span>
                               <span class="org">│  skr8tr_node    │</span>  Fleet node (N nodes)
-                              <span class="org">│  fork + exec    │</span>  Runs your workloads
+                              <span class="org">│  fork + exec    │</span>  Runs your workloads · metrics :9100
                               <span class="org">└────────┬────────┘</span>
                                        │ REGISTER via UDP :7772
                               <span class="hi">┌────────▼────────┐</span>
-                              <span class="hi">│  skr8tr_reg     │</span>  The Tower
+                              <span class="hi">│  skr8tr_reg     │</span>  The Tower · REGISTER/LOOKUP
                               <span class="hi">│  (UDP :7772)    │</span>  Service discovery
                               <span class="hi">└─────────────────┘</span>
   </div>
+  <p style="margin-top:1.4rem;font-size:0.84rem;color:var(--muted);">
+    The <strong style="color:var(--gold)">Audit Ledger</strong> runs inside the Conductor — every SUBMIT, EVICT, ROLLOUT, EXEC, and AUTH_FAIL is SHA-256 chained and optionally AES-256-GCM encrypted at rest. RFC 5424 syslog forwarding ships events to any SIEM. HIPAA · HITRUST · PCI DSS · NIST 800-53 · SOC 2.
+  </p>
 </section>
 
 <hr class="divider" />
@@ -795,7 +908,26 @@ nohup bin/skr8tr_ingress --listen 80 --tower conductor-host \
 skr8tr ping                                                  <span class="comment"># verify cluster is up</span>
 skr8tr --key ~/.skr8tr/signing.sec up examples/api.skr8tr   <span class="comment"># deploy</span>
 skr8tr list                                                  <span class="comment"># verify running</span>
-skr8tr logs api-server                                       <span class="comment"># tail logs</span></div>
+skr8tr logs api-server                                       <span class="comment"># tail logs</span>
+skr8tr exec api-server "env | grep PORT"                    <span class="comment"># remote exec</span></div>
+      </div>
+    </div>
+    <div class="install-step">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <h4>Enable compliance features (HIPAA / PCI DSS environments)</h4>
+        <div class="code-block">
+<span class="comment"># Generate 256-bit audit encryption key (do once)</span>
+openssl rand -out ~/.skr8tr/audit.key 32 &amp;&amp; chmod 600 ~/.skr8tr/audit.key
+
+<span class="comment"># Start Conductor with AES-256-GCM encrypted audit log + SIEM syslog</span>
+nohup bin/skr8tr_sched   --pubkey skrtrview.pub   --audit-key ~/.skr8tr/audit.key   --syslog-host 10.0.0.20 \          <span class="comment"># your SIEM collector IP</span>
+  --syslog-tls \                      <span class="comment"># RFC 5425 TLS transport (HIPAA §164.312(e))</span>
+  --syslog-ca /etc/ssl/siem-ca.pem   &gt; /tmp/sched.log 2&gt;&amp;1 &amp;
+
+<span class="comment"># Verify the audit chain at any time</span>
+skr8tr audit 50          <span class="comment"># tail last 50 entries</span>
+skr8tr audit-verify      <span class="comment"># walk full chain — returns OK or CHAIN BROKEN</span></div>
       </div>
     </div>
   </div>
@@ -821,8 +953,8 @@ skr8tr logs api-server                                       <span class="commen
       <p>Role-based access control with team namespaces, ML-DSA-65 signed per-team keys, and permission scopes: read / submit / evict / admin.</p>
     </div>
     <div class="ef-card">
-      <h4>Audit Export</h4>
-      <p>Structured, cryptographically chained audit log shipped to S3, Elasticsearch, or any SIEM. Tamper-evident, append-only, queryable.</p>
+      <h4>Compliance &amp; Audit</h4>
+      <p>The audit chain (SHA-256 blockchain, AES-256-GCM encryption, RFC 5424 syslog) ships in the open-source build. Enterprise adds structured export to S3, structured JSON to Elasticsearch, and custom compliance report generation for QSA/3PAO assessments.</p>
     </div>
     <div class="ef-card">
       <h4>SSO / OIDC</h4>
@@ -865,24 +997,61 @@ skr8tr logs api-server                                       <span class="commen
     </div>
 
     <div class="pricing-card">
-      <div class="pricing-badge">// TRAINING</div>
-      <h3>Team Workshops</h3>
-      <div class="pricing-price">$2,000 <span>/ day</span></div>
-      <p>Half-day or full-day workshops for engineering teams. Topics: C23 systems programming, Skr8tr operations, post-quantum security fundamentals, and migrating off Docker/k8s.</p>
+      <div class="pricing-badge">// CUSTOM DEVELOPMENT</div>
+      <h3>Custom Integration &amp; Feature Work</h3>
+      <div class="pricing-price">$1,500 <span>/ day</span></div>
+      <p>Need a bespoke feature — RBAC namespaces, SSO bridge, S3 audit export, custom SIEM adapter, GPU workload scheduling, or a compliance report generator for your QSA? We build it directly in C23 against your requirements.</p>
       <ul class="pricing-features">
-        <li>Remote or on-site</li>
-        <li>Customized to your stack and team level</li>
-        <li>Hands-on labs with your real workloads</li>
-        <li>Workshop materials + recording included</li>
+        <li>Scope defined and agreed before a line of code is written</li>
+        <li>Delivered as upstream-compatible open-source or private fork</li>
+        <li>Full documentation + integration tests included</li>
+        <li>Source handed over — no vendor lock-in, ever</li>
       </ul>
-      <a class="btn-enterprise" href="mailto:scott.bakerphx@gmail.com?subject=Skr8tr%20Workshop">Inquire &rarr;</a>
+      <a class="btn-enterprise" href="mailto:scott.bakerphx@gmail.com?subject=Skr8tr%20Custom%20Dev">Discuss Your Requirements &rarr;</a>
+    </div>
+  </div>
+
+  <!-- What to provide -->
+  <div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:2rem 2.2rem;margin-bottom:2rem;">
+    <div class="section-label" style="margin-bottom:0.6rem;">// WHAT TO PROVIDE</div>
+    <p style="color:var(--muted);font-size:0.9rem;margin-bottom:1.2rem;">
+      We do the work. You provide the context. Here is exactly what we need to get started — nothing more:
+    </p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem;">
+      <div>
+        <p style="font-size:0.84rem;color:var(--text);font-weight:600;margin-bottom:0.4rem;">For cluster setup / migration</p>
+        <ul style="list-style:none;font-size:0.84rem;color:var(--muted);line-height:2;">
+          <li>→ SSH or VPN access to your target hosts</li>
+          <li>→ <code>kubectl get nodes -o wide</code> (if migrating from k8s)</li>
+          <li>→ <code>kubectl get deployments -A -o yaml</code></li>
+          <li>→ Ingress rules / current routing table</li>
+          <li>→ Any secret injection requirements</li>
+        </ul>
+      </div>
+      <div>
+        <p style="font-size:0.84rem;color:var(--text);font-weight:600;margin-bottom:0.4rem;">For architecture review</p>
+        <ul style="list-style:none;font-size:0.84rem;color:var(--muted);line-height:2;">
+          <li>→ <code>docker ps</code> / <code>kubectl get all -A</code> output</li>
+          <li>→ Current infra diagram or a written description</li>
+          <li>→ List of pain points (latency, cost, ops burden)</li>
+          <li>→ Read-only codebase access (GitHub/GitLab link) if available</li>
+        </ul>
+      </div>
+      <div>
+        <p style="font-size:0.84rem;color:var(--text);font-weight:600;margin-bottom:0.4rem;">For custom feature development</p>
+        <ul style="list-style:none;font-size:0.84rem;color:var(--muted);line-height:2;">
+          <li>→ A written spec or user story (1 page is enough)</li>
+          <li>→ Target environment (bare metal, cloud, hybrid)</li>
+          <li>→ Compliance constraints (HIPAA, PCI, FedRAMP…)</li>
+          <li>→ Read access to your Skr8tr fork if you have one</li>
+        </ul>
+      </div>
     </div>
   </div>
 
   <div style="text-align:center; padding: 1rem 0 0.5rem;">
     <p style="color:var(--muted); font-size:0.92rem; margin-bottom:1.4rem;">
-      All serious inquiries get a response within 24 hours.<br>
-      Include your node count, workload types, and current orchestrator — we'll come back with a concrete proposal.
+      All serious inquiries get a response within 24 hours.
     </p>
     <a class="btn btn-primary" href="mailto:scott.bakerphx@gmail.com?subject=Skr8tr%20Enterprise%20Inquiry">Contact Us &rarr;</a>
   </div>
