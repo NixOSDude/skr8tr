@@ -3,6 +3,7 @@ name        = "skr8tr"
 version     = "0.1.0"
 edition     = "2021"
 description = "Skr8tr — Sovereign Workload Orchestrator CLI"
+build       = "build.rs"
 
 [[bin]]
 name = "skr8tr"
