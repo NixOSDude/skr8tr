@@ -692,3 +692,69 @@ All other blog posts audited — no other k8s concessions found.
 - src/enterprise/ is in .gitignore — these files cannot reach GitHub by design
 - DO NOT attempt git history manipulation to "protect" enterprise code — it is
   already protected and has never been committed to the OSS repo
+
+---
+
+## 2026-04-07 — Git System Fully Documented (Exact, No Shorthand)
+
+### What This Session Established
+
+The exact two-remote git system was diagnosed, corrected, and documented after multiple
+incidents where enterprise files reached GitHub and session state was lost.
+
+### The Two Remotes (Exact)
+
+```
+enterprise  →  gitea@192.168.68.50:gitea/skr8tr-enterprise.git
+               Receives ALL files: OSS + enterprise source + agent/ + CLAUDE.md + SESSION_STATE.md
+
+github      →  git@github.com:NixOSDude/skr8tr.git
+               Receives OSS files ONLY: src/core, src/daemon, src/parser, src/server,
+               src/cockpit, src/tools, cli/, docs/, flake.nix, Makefile, README.md
+               NEVER receives: src/enterprise/, agent/, shell.nix, CLAUDE.md, SESSION_STATE.md
+```
+
+### How the Boundary Works
+
+`.gitignore` blocks enterprise files from normal `git add`. They are never staged,
+never committed, never pushed to GitHub by accident. No filter tools needed.
+
+To commit enterprise files for the enterprise remote: `git add -f <path>`
+After doing so: push to `enterprise` ONLY — NEVER to `github`.
+
+### Incidents That Forced This Documentation
+
+1. `CLAUDE.md` (contains VPS password + internal ops) pushed to public GitHub — exposed
+2. `src/enterprise/`, `agent/`, `enterprise-flake.nix`, `shell.nix` pushed to public GitHub
+3. `enterprise-flake.nix` re-appeared on GitHub after filter-branch ran on wrong remote
+4. Enterprise remote pointed to wrong IP (192.168.0.54 instead of 192.168.68.50) — 
+   two push operations failed silently; captain caught it
+5. Force-push to enterprise after filter-branch stripped enterprise files from enterprise history
+   (correct enterprise files had to be re-committed with git add -f)
+6. LambdaC: Python HTTP server introduced — Federation Law #5 violation (Rust/C23 only)
+   Fixed: lambbook-serve Rust binary built as replacement
+
+### Exact Push Commands for Every Scenario
+
+| Scenario | Command |
+|---|---|
+| OSS files only | `git push enterprise main && git push github main` |
+| docs/ website/blog | `git push enterprise main && git push github main` |
+| Enterprise source changed | `git push enterprise main` ONLY |
+| Session handoff | `git push enterprise main` ONLY (SESSION_STATE.md is in the commit) |
+
+### Current Remote State
+- enterprise/main: has enterprise files committed — correct
+- github/main: OSS only — correct
+- local/main: matches enterprise/main
+- No `origin` remote — removed to prevent accidents
+
+### Laws Updated This Session
+- Law 13: No VPS Law (was wrong VPS details)
+- Law 15: src/enterprise/ gitignored — NEVER filter-branch without authorization
+- Law 17: GitHub push = `git push github main` directly, no tmp clone, no filter tools
+- Law 18: Website Deployment Law — GitHub Pages from docs/, NO VPS
+- Law 19: Website/Blog Content Law — show what it does, never how it's built
+- Law 20: Enterprise Repo Law — enterprise remote gets everything; github gets OSS only
+- Law 21: File Ownership Tagging
+- Git Protocol section: replaced with exact, scenario-by-scenario reference
