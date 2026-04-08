@@ -1,0 +1,34 @@
+# SSoA LEVEL 2: MANIFOLD ANCHOR
+# CRATE: ra-rag
+# MISSION: RAG pipeline engine — embed, search, generate.
+
+[package]
+name        = "ra-rag"
+description = "RAG pipeline — embed (ONNX/CUDA), search (usearch), generate (rig-core/Ollama)"
+version.workspace    = true
+edition.workspace    = true
+authors.workspace    = true
+license.workspace    = true
+
+[lib]
+name = "ra_rag"
+path = "src/lib.rs"
+
+[dependencies]
+tokio.workspace       = true
+serde.workspace       = true
+serde_json.workspace  = true
+anyhow.workspace      = true
+thiserror.workspace   = true
+tracing.workspace     = true
+ort.workspace         = true
+ndarray.workspace     = true
+usearch.workspace     = true
+rig-core.workspace    = true
+reqwest.workspace     = true
+tokenizers.workspace  = true
+bytes.workspace       = true
+futures.workspace     = true
+async-trait.workspace = true
+chrono.workspace      = true
+uuid.workspace        = true
