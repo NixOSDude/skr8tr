@@ -17,7 +17,7 @@ skr8tr.svg
 
 # Enterprise features — Gitea private only, never GitHub
 src/enterprise/
-enterprise-flake.nix
+# enterprise-flake.nix moved to src/enterprise/flake.nix (covered by src/enterprise/ above)
 shell.nix
 agent/
 CLAUDE.md
