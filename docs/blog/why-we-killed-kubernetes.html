@@ -612,17 +612,22 @@ spec:
     </p>
 
     <ul>
-      <li><strong>No container runtime</strong> — workloads are bare processes on the host network. No OCI, no overlay filesystems, no image pull latency. If you need kernel-level namespace isolation for untrusted multi-tenant workloads, that is a container runtime job, not an orchestrator job.</li>
+      <li><strong>No container runtime</strong> — workloads are bare processes on the host network. No OCI, no overlay filesystems, no image pull latency. This is not a limitation — it is the point. Skipping the container layer eliminates the image build pipeline, the registry, the overlay filesystem, and the entire containerd daemon. Your binary is already on the node. Skr8tr runs it.</li>
       <li><strong>TLS at ingress</strong> — <code>skr8tr_ingress</code> supports TLS termination via <code>--tls-cert</code> and <code>--tls-key</code>. You can also terminate at a cloud load balancer (ALB, GCP HTTPS LB, Cloudflare) and run plain HTTP internally — both patterns are supported.</li>
       <li><strong>Persistent volumes</strong> — the <code>volume {}</code> manifest block bind-mounts host paths into workloads as environment variables post-fork. Stateful services (Postgres, etc.) work today. No CSI driver — host paths are explicit and auditable.</li>
       <li><strong>No image registry</strong> — binaries are pre-placed on nodes. A simple <code>rsync</code> step in CI is faster and more explicit than a 200 MB image push. Skr8tr calls <code>fork()</code> and <code>execve()</code> — the binary is already on disk.</li>
-      <li><strong>Multi-tenant RBAC and namespace isolation</strong> — available in the enterprise tier. Per-team ML-DSA-65 keys, namespace quotas, and full audit trail. See <a href="https://skr8tr.online/#enterprise">skr8tr.online/#enterprise</a>.</li>
+      <li><strong>Multi-tenant RBAC and namespace isolation</strong> — available in the enterprise tier. Per-team ML-DSA-65 signing keys mean a team cannot deploy to a namespace they do not own — enforced cryptographically, not by policy YAML. Namespace quotas cap CPU, memory, and replica count per team. Every deployment, scale event, and rollback is written to an append-only audit chain. See <a href="https://skr8tr.online/#enterprise">skr8tr.online/#enterprise</a>.</li>
     </ul>
 
     <p>
-      If you are running a Kubernetes cluster for your own services, Skr8tr is likely the
-      simpler answer. If you need multi-tenant container isolation with network policies,
-      Kubernetes is the right tool for that specific problem.
+      If you are running a Kubernetes cluster for your own services — whether that is one team
+      or fifty — Skr8tr is the simpler, faster, and more auditable answer. The multi-tenant
+      story is not a gap: enterprise RBAC gives you per-team cryptographic boundaries with
+      zero YAML and no cert rotation ceremony. The only workloads Skr8tr does not target are
+      those that execute arbitrary untrusted third-party code at the kernel level — a PaaS
+      problem that has nothing to do with orchestration and everything to do with sandboxing.
+      If that is not your use case, the complexity you are carrying in Kubernetes is not
+      load-bearing.
     </p>
 
     <h2>The Source</h2>
@@ -631,13 +636,17 @@ spec:
       Skr8tr is Apache 2.0. The full source is on
       <a href="https://github.com/NixOSDude/skr8tr">GitHub</a>. The control plane is ~2000
       lines of C23 across four files. The CLI is ~500 lines of Rust. The parser for
-      <code>.skr8tr</code> manifests is 200 lines. It is small enough to read in an afternoon.
+      <code>.skr8tr</code> manifests is 200 lines. It is small enough to read in an afternoon —
+      because we built it to be small enough to run in 15 MB of RAM and deploy in under a second.
     </p>
 
     <p>
-      If you are running a Kubernetes cluster for three services, I would invite you to spend
-      that afternoon reading Skr8tr's source and considering whether the complexity you are
-      carrying is load-bearing.
+      Kubernetes is 1.5 million lines of Go, an 800 MB control plane, and an etcd cluster that
+      needs three nodes just to avoid a split-brain. It was designed for Google's infrastructure
+      team to manage tens of thousands of machines. You have five nodes and three services.
+      Skr8tr is the right tool for that job — today, in production, with post-quantum auth
+      and a full audit chain built in. The question is not whether you <em>can</em> run
+      Kubernetes. The question is whether you should have to.
     </p>
 
     <hr />
