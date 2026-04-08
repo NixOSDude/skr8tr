@@ -660,3 +660,35 @@ make clean && make ENTERPRISE=1  # 9 enterprise binaries, zero warnings
 ### Next Priority
 - Optional: restore OSS code snippets to 3 non-audit blog posts if Captain wants
 - Session state chart (OSS vs enterprise completion) — pending from earlier request
+
+---
+
+## 2026-04-07 — Blog k8s Concession Removed + Federation Laws Hardened
+
+### Blog Fix: why-we-killed-kubernetes.html
+The "Design Decisions Worth Knowing" section previously told readers
+"Kubernetes is the right tool for that specific problem" (multi-tenant container isolation).
+This is wrong — Skr8tr Enterprise has RBAC, per-team ML-DSA-65 keys, namespace quotas,
+and a full audit chain. We hand no wins to a competitor we are built to replace.
+
+Rewrites:
+- No container runtime bullet: no-OCI is a deliberate design choice for performance
+  and simplicity. Not a limitation.
+- Closing paragraph: enterprise RBAC handles trusted multi-tenant. Untrusted PaaS
+  sandboxing (running strangers' code) is a different product category. Skr8tr wins
+  for teams running their own services — that is 99% of the use case.
+- The Source closing: assertive and final. Kubernetes numbers stated. Skr8tr is the answer.
+
+All other blog posts audited — no other k8s concessions found.
+
+### Federation Laws Updated
+- Law 15: src/enterprise/ is in .gitignore. NEVER committed. NEVER needs filtering.
+  NEVER run filter-branch or filter-repo on this repo.
+- Law 17: GitHub push = `git push github main` directly. No tmp clone. No filter tools.
+  The gitignore already prevents enterprise code from ever being committed.
+- Law 20 (new): Enterprise push = `git push enterprise main` exclusively.
+
+### Enterprise Code Safety
+- src/enterprise/ is in .gitignore — these files cannot reach GitHub by design
+- DO NOT attempt git history manipulation to "protect" enterprise code — it is
+  already protected and has never been committed to the OSS repo
