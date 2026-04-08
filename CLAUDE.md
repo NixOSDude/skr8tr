@@ -168,18 +168,34 @@ make && cd cli && cargo build --release
     run filter-branch, filter-repo, or ANY git history manipulation on enterprise paths.
     They are already protected by `.gitignore`. DO NOT TOUCH THEM.**
 
-17. **GitHub Push Protocol** — GitHub (`https://github.com/NixOSDude/skr8tr`) is for
-    OSS code and `docs/` ONLY. `src/enterprise/` and `agent/` are in `.gitignore` —
-    they are never committed, never need filtering. Push OSS/docs changes like this:
+17. **GitHub Push Protocol** — GitHub (`https://github.com/NixOSDude/skr8tr`) is the
+    source of truth for OSS files. Because local/main contains enterprise commits
+    (force-added via `git add -f`), pushing local/main directly to github would expose
+    enterprise files. The safe method is the **tmp/clone protocol**:
+
+    ```bash
+    # 1. Clone the clean OSS repo from GitHub into /tmp:
+    git clone git@github.com:NixOSDude/skr8tr.git /tmp/skr8tr-oss
+
+    # 2. Copy only the OSS file(s) into the clone:
+    cp ~/skr8tr/<oss-file> /tmp/skr8tr-oss/<path>/
+
+    # 3. Commit and push from inside the clean clone:
+    cd /tmp/skr8tr-oss
+    git add <file>
+    git commit -m "OSS: ..."
+    git push origin main
+
+    # 4. Clean up:
+    rm -rf /tmp/skr8tr-oss
     ```
-    git add docs/  (or specific oss files)
-    git commit -m "..."
-    git push github main
-    ```
-    DO NOT clone to /tmp. DO NOT run filter-repo. DO NOT run filter-branch.
-    The `.gitignore` already prevents enterprise code from ever being committed.
-    **NEVER run git history rewriting commands (filter-branch, filter-repo, rebase)
-    without explicit written authorization from Captain.**
+
+    The clone starts from GitHub's clean OSS history. Enterprise files are NEVER
+    in that clone and NEVER pushed to GitHub. This is the ONLY safe method for
+    sending OSS files to the public repo from a local tree that has enterprise commits.
+
+    **NEVER run filter-repo, filter-branch, or any git history rewriting commands
+    without Captain's explicit written authorization.**
 18. **Website Deployment Law** — The website (`docs/`) is served as **GitHub Pages** from the
     `docs/` directory of the `github` remote (NixOSDude/skr8tr). There is NO VPS. Do NOT
     attempt to scp or ssh to any server to deploy website changes. The correct deploy sequence
@@ -335,12 +351,22 @@ git add MILESTONES.md
 # Commit:
 git commit -m "OSS: [description]"
 
-# Can push to BOTH remotes — OSS files only, enterprise remote also wants these:
+# Push to enterprise first (always):
 git push enterprise main
-git push github main
+```
 
-# OR push to enterprise only if github sync can wait:
-git push enterprise main
+**For GitHub (public OSS source of truth) — use the tmp/clone protocol:**
+Because local/main contains enterprise commits, NEVER push local/main directly to github.
+Instead use the tmp/clone protocol (see Law 17 above):
+
+```bash
+git clone git@github.com:NixOSDude/skr8tr.git /tmp/skr8tr-oss
+cp ~/skr8tr/<changed-oss-file> /tmp/skr8tr-oss/<path>/
+cd /tmp/skr8tr-oss
+git add <file>
+git commit -m "OSS: ..."
+git push origin main
+rm -rf /tmp/skr8tr-oss
 ```
 
 ### Session Handoff Commits (MILESTONES.md + SESSION_STATE.md)
@@ -357,20 +383,20 @@ git push enterprise main
 
 ### Scenario Reference
 
-| What changed | Stage | Push |
+| What changed | Enterprise remote | GitHub (OSS public) |
 |---|---|---|
-| OSS source files only | `git add <specific oss files>` | `git push enterprise main && git push github main` |
-| docs/ (website/blog) | `git add docs/` | `git push enterprise main && git push github main` |
-| Enterprise source only | `git add -f src/enterprise/` (etc.) | `git push enterprise main` ONLY |
-| Session handoff (MILESTONES + SESSION_STATE) | `git add MILESTONES.md && git add -f SESSION_STATE.md` | `git push enterprise main` ONLY |
-| Mixed OSS + enterprise | `git add <oss>` then separate `git add -f <enterprise>` — two commits | OSS commit → both remotes; enterprise commit → enterprise ONLY |
+| OSS source files only | `git push enterprise main` | tmp/clone protocol (Law 17) |
+| docs/ (website/blog) | `git push enterprise main` | tmp/clone protocol (Law 17) |
+| Enterprise source only | `git push enterprise main` ONLY | NEVER |
+| Session handoff (MILESTONES + SESSION_STATE) | `git push enterprise main` ONLY | NEVER |
+| Mixed OSS + enterprise | enterprise commit → `git push enterprise main` ONLY | OSS files only via tmp/clone |
 
 ### What NEVER To Do
 
 - `git add -A` or `git add .` — always add files by specific path
-- `git push github main` when enterprise files are staged or in the commit
+- `git push github main` directly from local — local/main has enterprise commits in it
 - `git filter-branch`, `git filter-repo`, `git rebase` — **NEVER without Captain's explicit authorization**
-- Clone to /tmp and push from there — the gitignore already protects the github push
+- Copy enterprise files (`src/enterprise/`, `agent/`, etc.) into the /tmp clone
 - Change the remote URLs without Captain's authorization
 
 ### Current Remote State (as of 2026-04-07)

@@ -34,10 +34,19 @@ No `origin` remote exists. Removed to prevent accidents.
 
 **OSS-only changes (src/core, src/daemon, src/parser, docs/, cli/, flake.nix, etc.):**
 ```bash
+# 1. Commit to local/enterprise as normal:
 git add <specific files>         # NEVER git add -A or git add .
-git commit -m "..."
+git commit -m "OSS: ..."
 git push enterprise main
-git push github main             # safe — enterprise files are gitignored, not staged
+
+# 2. Push to GitHub via tmp/clone protocol (local/main has enterprise commits — never push directly):
+git clone git@github.com:NixOSDude/skr8tr.git /tmp/skr8tr-oss
+cp ~/skr8tr/<changed-file> /tmp/skr8tr-oss/<path>/
+cd /tmp/skr8tr-oss
+git add <file>
+git commit -m "OSS: ..."
+git push origin main
+rm -rf /tmp/skr8tr-oss
 ```
 
 **Enterprise changes (src/enterprise/, agent/):**
@@ -46,7 +55,7 @@ git add -f src/enterprise/       # force past gitignore
 git add -f agent/
 git add -f shell.nix             # if modified
 git commit -m "Enterprise: ..."
-git push enterprise main         # ONLY — NEVER git push github main after force-adding enterprise
+git push enterprise main         # ONLY — NEVER push to github
 ```
 
 **Session handoff (MILESTONES.md + SESSION_STATE.md):**
@@ -59,20 +68,22 @@ git push enterprise main         # ONLY
 
 **Website/blog (docs/ only):**
 ```bash
-git add docs/
-git commit -m "docs: ..."
-git push enterprise main
-git push github main             # triggers GitHub Pages CDN deploy (~5-10 min)
+# Enterprise:
+git add docs/ && git commit -m "docs: ..." && git push enterprise main
+# GitHub (tmp/clone):
+git clone git@github.com:NixOSDude/skr8tr.git /tmp/skr8tr-oss
+cp -r ~/skr8tr/docs/ /tmp/skr8tr-oss/
+cd /tmp/skr8tr-oss && git add docs/ && git commit -m "docs: ..." && git push origin main
+rm -rf /tmp/skr8tr-oss
 ```
 
 ### What NEVER To Do
 
 - `git add -A` or `git add .`
-- `git push github main` when enterprise files are staged or in the commit
+- `git push github main` directly from local — local/main has enterprise commits in history
+- Copy enterprise files into the /tmp clone
 - `git filter-branch`, `git filter-repo`, `git rebase` without Captain's explicit authorization
-- Clone to /tmp and push — gitignore already protects the github push
 - Change remote URLs without Captain's authorization
-- Assume enterprise files are safe on GitHub — verify with `git show github/main:src/enterprise/` first
 
 ### Verify Remotes
 ```bash
