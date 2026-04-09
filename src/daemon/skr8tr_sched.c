@@ -951,26 +951,29 @@ static void handle_command(const char* cmd, const FabricAddr* src,
     const char *effective_cmd = cmd;
 
     if (g_auth_enabled) {
+        /* Strip signature from any signed command — read-only or not.
+         * The CLI auto-signs with ~/.skr8tr/signing.sec when the key exists.
+         * For read-only commands (PING, NODES, LIST) we strip but don't reject. */
+        int is_signed = (skrauth_verify(cmd, g_pubkey_path,
+                                        bare_cmd, sizeof(bare_cmd)) == 0);
+        if (is_signed) effective_cmd = bare_cmd;
+
         int needs_auth = (!strncmp(cmd, "SUBMIT|",  7) ||
                           !strncmp(cmd, "EVICT|",   6) ||
                           !strncmp(cmd, "ROLLOUT|", 8));
-        if (needs_auth) {
-            if (skrauth_verify(cmd, g_pubkey_path,
-                               bare_cmd, sizeof(bare_cmd)) != 0) {
-                fprintf(stderr,
-                        "[sched] UNAUTHORIZED command from %s — "
-                        "sign with: skr8tr --key ~/.skr8tr/signing.sec\n",
-                        src->ip);
+        if (needs_auth && !is_signed) {
+            fprintf(stderr,
+                    "[sched] UNAUTHORIZED command from %s — "
+                    "sign with: skr8tr --key ~/.skr8tr/signing.sec\n",
+                    src->ip);
 #ifdef ENTERPRISE
-                skraudit_log(SKRAUDIT_AUTH_FAIL, "", src->ip,
-                             "bad or missing ML-DSA-65 signature");
+            skraudit_log(SKRAUDIT_AUTH_FAIL, "", src->ip,
+                         "bad or missing ML-DSA-65 signature");
 #endif
-                snprintf(resp, resp_len,
-                         "ERR|UNAUTHORIZED — sign commands with: "
-                         "skr8tr --key ~/.skr8tr/signing.sec");
-                return;
-            }
-            effective_cmd = bare_cmd;
+            snprintf(resp, resp_len,
+                     "ERR|UNAUTHORIZED — sign commands with: "
+                     "skr8tr --key ~/.skr8tr/signing.sec");
+            return;
         }
     }
 
