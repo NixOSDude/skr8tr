@@ -63,3 +63,14 @@ int skrauth_sign(const char *cmd, const char *seckey_path,
  */
 int skrauth_verify(const char *signed_cmd, const char *pubkey_path,
                    char *cmd_out, size_t cmd_out_len);
+
+/*
+ * skrauth_strip — structural strip only, no crypto.
+ *
+ * Detects whether signed_cmd matches the signed wire format
+ * (<cmd>|<ts>|<6618-hex-chars>) and extracts the bare command into cmd_out.
+ * Does NOT load a pubkey or verify the signature — safe to call in dev mode.
+ * Returns 0 if the wire format was detected and cmd_out was filled,
+ * -1 if signed_cmd does not look like a signed command.
+ */
+int skrauth_strip(const char *signed_cmd, char *cmd_out, size_t cmd_out_len);

@@ -943,37 +943,42 @@ static void* rebalancer_thread(void* arg) {
 static void handle_command(const char* cmd, const FabricAddr* src,
                            char* resp, size_t resp_len) {
     /* ---------------------------------------------------------------
-     * PQC auth gate — verify ML-DSA-65 signature on mutating commands.
-     * SUBMIT and EVICT require a valid signature when auth is enabled.
-     * Read-only commands (NODES, LIST, PING) are always permitted.
+     * PQC auth gate — strip signatures and enforce auth on mutations.
+     *
+     * The CLI auto-signs ALL commands (including read-only PING/NODES/LIST)
+     * when ~/.skr8tr/signing.sec exists — in both auth and dev mode.
+     * skrauth_strip() detects and removes the wire signature without
+     * touching a pubkey, so it works regardless of g_auth_enabled.
+     * skrauth_verify() is then called only for mutating commands when
+     * auth is enabled, to cryptographically enforce the signature.
      * --------------------------------------------------------------- */
     char bare_cmd[FABRIC_MTU];
     const char *effective_cmd = cmd;
 
-    if (g_auth_enabled) {
-        /* Strip signature from any signed command — read-only or not.
-         * The CLI auto-signs with ~/.skr8tr/signing.sec when the key exists.
-         * For read-only commands (PING, NODES, LIST) we strip but don't reject. */
-        int is_signed = (skrauth_verify(cmd, g_pubkey_path,
-                                        bare_cmd, sizeof(bare_cmd)) == 0);
-        if (is_signed) effective_cmd = bare_cmd;
+    /* Always strip — handles signed commands in dev mode too */
+    if (skrauth_strip(cmd, bare_cmd, sizeof(bare_cmd)) == 0)
+        effective_cmd = bare_cmd;
 
-        int needs_auth = (!strncmp(cmd, "SUBMIT|",  7) ||
-                          !strncmp(cmd, "EVICT|",   6) ||
-                          !strncmp(cmd, "ROLLOUT|", 8));
-        if (needs_auth && !is_signed) {
-            fprintf(stderr,
-                    "[sched] UNAUTHORIZED command from %s — "
-                    "sign with: skr8tr --key ~/.skr8tr/signing.sec\n",
-                    src->ip);
+    if (g_auth_enabled) {
+        int needs_auth = (!strncmp(effective_cmd, "SUBMIT|",  7) ||
+                          !strncmp(effective_cmd, "EVICT|",   6) ||
+                          !strncmp(effective_cmd, "ROLLOUT|", 8));
+        if (needs_auth) {
+            if (skrauth_verify(cmd, g_pubkey_path,
+                               bare_cmd, sizeof(bare_cmd)) != 0) {
+                fprintf(stderr,
+                        "[sched] UNAUTHORIZED command from %s — "
+                        "sign with: skr8tr --key ~/.skr8tr/signing.sec\n",
+                        src->ip);
 #ifdef ENTERPRISE
-            skraudit_log(SKRAUDIT_AUTH_FAIL, "", src->ip,
-                         "bad or missing ML-DSA-65 signature");
+                skraudit_log(SKRAUDIT_AUTH_FAIL, "", src->ip,
+                             "bad or missing ML-DSA-65 signature");
 #endif
-            snprintf(resp, resp_len,
-                     "ERR|UNAUTHORIZED — sign commands with: "
-                     "skr8tr --key ~/.skr8tr/signing.sec");
-            return;
+                snprintf(resp, resp_len,
+                         "ERR|UNAUTHORIZED — sign commands with: "
+                         "skr8tr --key ~/.skr8tr/signing.sec");
+                return;
+            }
         }
     }
 

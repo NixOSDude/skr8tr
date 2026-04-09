@@ -125,6 +125,54 @@ int skrauth_sign(const char *cmd, const char *seckey_path,
 }
 
 /* -------------------------------------------------------------------------
+ * skrauth_strip — structural detection and extraction, no crypto
+ * ---------------------------------------------------------------------- */
+
+int skrauth_strip(const char *signed_cmd, char *cmd_out, size_t cmd_out_len) {
+    size_t total = strlen(signed_cmd);
+
+    /* Must be at least long enough to contain |ts|sig */
+    if (total < SKRAUTH_HEXSIG_LEN + 4)
+        return -1;
+
+    /* Last SKRAUTH_HEXSIG_LEN chars must be preceded by '|' */
+    const char *sig_sep = signed_cmd + total - SKRAUTH_HEXSIG_LEN - 1;
+    if (*sig_sep != '|')
+        return -1;
+
+    /* All hex-sig chars must be valid hex */
+    const char *hex_sig = sig_sep + 1;
+    for (size_t i = 0; i < SKRAUTH_HEXSIG_LEN; i++) {
+        char c = hex_sig[i];
+        if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') ||
+              (c >= 'A' && c <= 'F')))
+            return -1;
+    }
+
+    /* Find timestamp separator: last '|' in payload region */
+    const char *ts_sep = NULL;
+    for (const char *p = sig_sep - 1; p >= signed_cmd; p--) {
+        if (*p == '|') { ts_sep = p; break; }
+    }
+    if (!ts_sep) return -1;
+
+    /* Validate nonce window — reject replays even in dev mode */
+    time_t ts  = (time_t)strtoll(ts_sep + 1, NULL, 10);
+    time_t now = time(NULL);
+    long long delta = (long long)now - (long long)ts;
+    if (delta < -SKRAUTH_NONCE_WINDOW_S || delta > SKRAUTH_NONCE_WINDOW_S)
+        return -1;
+
+    /* Copy bare command (everything before ts_sep) to cmd_out */
+    size_t cmd_len = (size_t)(ts_sep - signed_cmd);
+    if (cmd_len == 0 || cmd_len >= cmd_out_len)
+        return -1;
+    memcpy(cmd_out, signed_cmd, cmd_len);
+    cmd_out[cmd_len] = '\0';
+    return 0;
+}
+
+/* -------------------------------------------------------------------------
  * skrauth_verify
  * ---------------------------------------------------------------------- */
 
