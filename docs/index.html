@@ -988,12 +988,11 @@
       <div class="step-body">
         <h4>Clone and build</h4>
         <div class="code-block">
-<span class="comment"># Dependencies: gcc (C23), liboqs ≥ 0.15, rustup</span>
 git clone https://github.com/NixOSDude/skr8tr
 cd skr8tr
-make                               <span class="comment"># builds all C23 daemons</span>
-cd cli && cargo build --release    <span class="comment"># builds the CLI</span>
-cp cli/target/release/skr8tr ~/.local/bin/</div>
+nix develop          <span class="comment"># pins gcc, liboqs, openssl — recommended</span>
+make                 <span class="comment"># builds all daemons + CLI into bin/</span></div>
+        <div style="color:var(--muted);font-size:0.84rem;margin-top:0.5rem;">No Nix? Install gcc (C23), liboqs ≥ 0.15, openssl ≥ 3.0 manually then run <code>make</code>.</div>
       </div>
     </div>
     <div class="install-step">
@@ -1002,8 +1001,9 @@ cp cli/target/release/skr8tr ~/.local/bin/</div>
         <h4>Generate your signing keypair (once per operator machine)</h4>
         <div class="code-block">
 bin/skrtrkey keygen
-<span class="comment"># → skrtrview.pub (1952 bytes) — copy to conductor host</span>
-<span class="comment"># → ~/.skr8tr/signing.sec (4032 bytes, chmod 600) — stays here</span></div>
+<span class="comment"># → skrtrview.pub          (1952 bytes) — place alongside skr8tr_sched</span>
+<span class="comment"># → ~/.skr8tr/signing.sec  (4032 bytes, chmod 600) — stays on your machine</span></div>
+        <div style="color:var(--muted);font-size:0.84rem;margin-top:0.5rem;"><strong>skrtrview.pub must be in the same directory you launch skr8tr_sched from.</strong> The conductor auto-detects it there — no flag needed.</div>
       </div>
     </div>
     <div class="install-step">
@@ -1011,9 +1011,9 @@ bin/skrtrkey keygen
       <div class="step-body">
         <h4>Start the cluster</h4>
         <div class="code-block">
-<span class="comment"># On the conductor/tower host:</span>
-nohup bin/skr8tr_reg   > /tmp/tower.log   2>&1 &
-nohup bin/skr8tr_sched --pubkey skrtrview.pub > /tmp/sched.log 2>&1 &
+<span class="comment"># On the conductor/tower host (run from the skr8tr directory):</span>
+nohup bin/skr8tr_reg   > /tmp/tower.log  2>&1 &
+nohup bin/skr8tr_sched > /tmp/sched.log  2>&1 &  <span class="comment"># auto-detects skrtrview.pub</span>
 
 <span class="comment"># On every worker node:</span>
 nohup bin/skr8tr_node  > /tmp/node.log   2>&1 &
@@ -1026,16 +1026,17 @@ nohup bin/skr8tr_ingress --listen 80 --tower conductor-host \
     <div class="install-step">
       <div class="step-num">4</div>
       <div class="step-body">
-        <h4>Deploy your first workload</h4>
+        <h4>Verify and deploy your first workload</h4>
         <div class="code-block">
-skr8tr ping                                                  <span class="comment"># verify cluster is up</span>
-skr8tr --key ~/.skr8tr/signing.sec up examples/api.skr8tr   <span class="comment"># deploy</span>
-skr8tr list                                                  <span class="comment"># verify running</span>
-skr8tr logs api-server                                       <span class="comment"># tail logs</span>
-skr8tr exec api-server "env | grep PORT"                    <span class="comment"># remote exec</span></div>
+bin/skr8tr ping                                                  <span class="comment"># → [PONG] conductor</span>
+bin/skr8tr nodes                                                 <span class="comment"># → live node list</span>
+bin/skr8tr --key ~/.skr8tr/signing.sec up examples/api.skr8tr   <span class="comment"># deploy</span>
+bin/skr8tr list                                                  <span class="comment"># verify running</span>
+bin/skr8tr logs api-server                                       <span class="comment"># tail logs</span>
+bin/skr8tr exec api-server "env | grep PORT"                    <span class="comment"># remote exec</span></div>
       </div>
     </div>
-    <div class="install-step">
+    <div class="install-step" style="display:none">
       <div class="step-num">5</div>
       <div class="step-body">
         <h4>Enable compliance features (HIPAA / PCI DSS environments)</h4>

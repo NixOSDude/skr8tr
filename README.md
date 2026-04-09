@@ -129,45 +129,45 @@ app api-server
 
 ## Quick Start
 
-### Dependencies
+### 1. Clone and build
 
-- `gcc` with C23 support (`-std=gnu23`)
-- `liboqs` ≥ 0.15.0 (post-quantum crypto — [open-quantum-safe.org](https://openquantumsafe.org))
-- `openssl` ≥ 3.0 (TLS ingress)
-- `rustup` + `cargo`
-- `pthread` (system)
-
-### Build
+**Recommended — Nix (handles all dependencies automatically):**
 
 ```bash
 git clone https://github.com/NixOSDude/skr8tr
 cd skr8tr
-
-# Build all C23 daemons
-make
-
-# Build the CLI
-cd cli && cargo build --release
-cp target/release/skr8tr ~/.local/bin/skr8tr
+nix develop          # drops you into a shell with gcc, liboqs, openssl pinned
+make                 # builds all daemons + CLI into bin/
 ```
 
-### Generate your keypair (once per operator machine)
+**Without Nix** (requires gcc C23, liboqs ≥ 0.15, openssl ≥ 3.0):
+
+```bash
+git clone https://github.com/NixOSDude/skr8tr
+cd skr8tr
+make
+```
+
+### 2. Generate your signing keypair (once per operator machine)
 
 ```bash
 bin/skrtrkey keygen
-# → skrtrview.pub    (1952 bytes) — copy to conductor host
+# → skrtrview.pub          (1952 bytes) — place alongside skr8tr_sched
 # → ~/.skr8tr/signing.sec  (4032 bytes, chmod 600) — stays on your machine
 ```
 
-### Start the cluster
+> **Important:** `skrtrview.pub` must be in the **same directory you launch `skr8tr_sched` from.**
+> The conductor auto-detects it there — no flag required.
+
+### 3. Start the cluster
 
 ```bash
-# On the conductor host:
-nohup bin/skr8tr_reg   > /tmp/tower.log   2>&1 &
-nohup bin/skr8tr_sched --pubkey skrtrview.pub > /tmp/sched.log 2>&1 &
+# On the conductor/tower host (run from the skr8tr directory):
+nohup bin/skr8tr_reg   > /tmp/tower.log  2>&1 &
+nohup bin/skr8tr_sched > /tmp/sched.log  2>&1 &   # auto-detects skrtrview.pub
 
 # On every worker node:
-nohup bin/skr8tr_node > /tmp/node.log 2>&1 &
+nohup bin/skr8tr_node  > /tmp/node.log   2>&1 &
 
 # Optional: HTTP ingress on port 80
 nohup bin/skr8tr_ingress \
@@ -177,13 +177,14 @@ nohup bin/skr8tr_ingress \
   > /tmp/ingress.log 2>&1 &
 ```
 
-### Deploy your first workload
+### 4. Verify and deploy
 
 ```bash
-skr8tr ping                                                   # verify cluster up
-skr8tr --key ~/.skr8tr/signing.sec up examples/my-server.skr8tr
-skr8tr list
-skr8tr logs my-server
+bin/skr8tr ping                                              # → [PONG] conductor
+bin/skr8tr nodes                                             # → live node list
+bin/skr8tr --key ~/.skr8tr/signing.sec up examples/my-server.skr8tr
+bin/skr8tr list
+bin/skr8tr logs my-server
 ```
 
 Full documentation: [OPERATIONS.md](OPERATIONS.md)
