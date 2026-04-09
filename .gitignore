@@ -1,23 +1,16 @@
+# Build artifacts
 bin/
-cli/target/
-*.o
-*.d
-*.tmp
-.DS_Store
+**/target/
 
-# Site-specific keys — regenerate per installation
+# Generated keys — operator-managed, never committed
 skrtrview.pub
+*.sec
 
-# Internal session / AI collaboration files — not for public repo
-CLAUDE.md
+# Conductor state file (local to working directory)
+skr8tr_conductor.state
+
+# Internal session files — not for public consumption
+MILESTONES.md
 SESSION_STATE.md
-
-# Root-level logo source (web copy lives in docs/)
-skr8tr.svg
-
-# Enterprise features — Gitea private only, never GitHub
-src/enterprise/
-# enterprise-flake.nix moved to src/enterprise/flake.nix (covered by src/enterprise/ above)
-shell.nix
-agent/
+MASTER_PLAN.md
 CLAUDE.md

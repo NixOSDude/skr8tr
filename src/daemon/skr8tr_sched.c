@@ -72,7 +72,7 @@
 #define SCALE_UP_CYCLES     2    /* consecutive high-CPU heartbeats before scale-up */
 #define SCALE_DOWN_CYCLES   4    /* consecutive low-CPU heartbeats before scale-down */
 #define REBALANCE_INTERVAL  5    /* seconds between replica health checks */
-#define STATE_FILE          "/tmp/skr8tr_conductor.state"  /* persistent workload state */
+#define STATE_FILE          "./skr8tr_conductor.state"  /* persistent workload state — local to conductor working dir */
 
 /* -------------------------------------------------------------------------
  * PQC auth state — ML-DSA-65 command signing gate
