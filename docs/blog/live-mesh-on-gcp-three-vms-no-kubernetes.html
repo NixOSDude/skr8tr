@@ -211,21 +211,6 @@ skr8tr_node --conductor 10.10.0.10 &</code></pre>
     no cgroup setup, no network namespace creation. <strong>Cold deploy time under one second.</strong>
   </p>
 
-  <h2>Machine Images Next</h2>
-
-  <p>
-    Now that the mesh is verified, the next step is baking GCP machine images — one for
-    the conductor role and one for worker nodes. Every dependency (liboqs, all daemons,
-    systemd units) will be baked into the image. Spinning up a new node becomes:
-    boot from image → register with conductor → receive workloads. No provisioning scripts.
-    No package managers at runtime. No external dependencies.
-  </p>
-
-  <p>
-    This is how production Skr8tr clusters will deploy: immutable images, self-registering
-    nodes, a conductor that requires no configuration to accept them.
-  </p>
-
   <hr />
 
   <p style="font-size:0.88rem;">
