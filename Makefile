@@ -10,7 +10,7 @@ ENTERPRISE_FLAGS =
 ifdef ENTERPRISE
   ENTERPRISE_FLAGS = -DENTERPRISE -I./src/enterprise
 endif
-CFLAGS  = -O3 -Wall -Wextra -std=gnu23 -I./src/core $(ENTERPRISE_FLAGS)
+CFLAGS  = -O3 -Wall -Wextra -std=gnu2x -I./src/core $(ENTERPRISE_FLAGS)
 LDFLAGS = -lpthread -loqs
 
 OQS_INC ?= $(shell pkg-config --variable=includedir liboqs 2>/dev/null)
@@ -40,7 +40,8 @@ all: $(BIN) \
      $(BIN)/skr8tr_serve \
      $(BIN)/skr8tr_ingress \
      $(BIN)/skrtrkey \
-     $(BIN)/skr8tr
+     $(BIN)/skr8tr \
+     $(BIN)/skr8tr_demo
 ifdef ENTERPRISE
 all: $(BIN)/skr8tr_rbac $(BIN)/skr8tr_sso
 endif
@@ -83,6 +84,9 @@ $(BIN)/skrtrkey: $(SRC)/tools/skrtrkey.c $(SRC)/core/skrauth.c
 
 $(BIN)/skr8tr: $(SRC)/tools/skr8tr_cli.c $(SRC)/core/fabric.c $(SRC)/core/skrauth.c
 	$(CC) $(CFLAGS) -I./src/parser $^ -o $@ $(LDFLAGS)
+
+$(BIN)/skr8tr_demo: $(SRC)/tools/skr8tr_demo.c
+	$(CC) $(CFLAGS) $^ -o $@ -lpthread
 
 $(BIN)/skr8tr_rbac: $(SRC)/enterprise/skr8tr_rbac.c $(SRC)/core/fabric.c
 	$(CC) $(CFLAGS) -I./src/enterprise $^ -o $@ $(LDFLAGS) -lssl -lcrypto

@@ -1294,7 +1294,13 @@ next_hb:
             else
                 snprintf(msg, sizeof(msg), "HEARTBEAT|%s|%d|%ld",
                          g_node_id, cpu, ram);
-            fabric_broadcast(g_sock, SKRTR_PORT, msg, strlen(msg));
+            /* Use unicast to conductor when host is known (required on VPC/cloud
+             * networks that do not forward broadcast packets). Falls back to
+             * broadcast only when conductor is still the default 127.0.0.1. */
+            if (strcmp(g_conductor_host, "127.0.0.1") != 0)
+                fabric_send(g_sock, g_conductor_host, SKRTR_PORT, msg, strlen(msg));
+            else
+                fabric_broadcast(g_sock, SKRTR_PORT, msg, strlen(msg));
         }
         sleep(HEARTBEAT_INTERVAL_S);
     }

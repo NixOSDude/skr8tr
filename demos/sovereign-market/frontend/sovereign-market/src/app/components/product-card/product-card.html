@@ -1,0 +1,25 @@
+<div class="product-card card" [routerLink]="['/product', product.id]" style="cursor:pointer">
+  <div class="product-img">
+    <img [src]="product.image_url" [alt]="product.name" loading="lazy" />
+    @if (!product.in_stock) {
+      <span class="out-badge badge badge-danger">Out of Stock</span>
+    }
+    @if (product.featured) {
+      <span class="feat-badge badge badge-accent">Featured</span>
+    }
+  </div>
+  <div class="product-body">
+    <p class="product-category text-muted">{{ product.subcategory }}</p>
+    <h3 class="product-name">{{ product.name }}</h3>
+    <div class="product-meta">
+      <span class="stars">{{ stars(product.rating) }}</span>
+      <span class="text-muted" style="font-size:.82rem">({{ product.review_count }})</span>
+    </div>
+    <div class="product-footer">
+      <span class="price">\${{ product.price.toFixed(2) }}</span>
+      <button class="btn btn-primary btn-sm" (click)="addToCart($event)" [disabled]="!product.in_stock || adding">
+        {{ adding ? '...' : '+ Cart' }}
+      </button>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,75 @@
+<div class="page">
+  <div class="catalog-layout container" style="padding-top:2rem;padding-bottom:3rem">
+
+    <!-- SIDEBAR -->
+    <aside class="filters-sidebar">
+      <h3>Filters</h3>
+
+      <div class="filter-group">
+        <span class="filter-label">Category</span>
+        <select [(ngModel)]="selectedCategory" (change)="applyFilters()">
+          <option value="">All Categories</option>
+          @for (cat of categories; track cat.name) {
+            <option [value]="cat.name">{{ cat.name }} ({{ cat.count }})</option>
+          }
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <span class="filter-label">Sort By</span>
+        <select [(ngModel)]="selectedSort" (change)="applyFilters()">
+          <option value="">Relevance</option>
+          <option value="price_asc">Price: Low → High</option>
+          <option value="price_desc">Price: High → Low</option>
+          <option value="rating">Highest Rated</option>
+          <option value="reviews">Most Reviewed</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <span class="filter-label">Price Range</span>
+        <div class="flex gap-1">
+          <input type="number" placeholder="Min" [(ngModel)]="minPrice" (change)="applyFilters()" />
+          <input type="number" placeholder="Max" [(ngModel)]="maxPrice" (change)="applyFilters()" />
+        </div>
+      </div>
+
+      <button class="btn btn-ghost w-full btn-sm" (click)="clearFilters()">Clear Filters</button>
+    </aside>
+
+    <!-- MAIN -->
+    <div class="catalog-main">
+      @if (result) {
+        <div class="results-header">
+          <p class="text-muted">
+            <strong style="color:var(--text)">{{ result.total }}</strong> products
+            @if (selectedCategory) { in <strong>{{ selectedCategory }}</strong> }
+          </p>
+          <p class="text-muted" style="font-size:.85rem">Page {{ result.page }} of {{ result.total_pages }}</p>
+        </div>
+      }
+
+      @if (loading) {
+        <div class="spinner"></div>
+      } @else if (result && result.products.length > 0) {
+        <div class="product-grid">
+          @for (p of result.products; track p.id) {
+            <app-product-card [product]="p" />
+          }
+        </div>
+
+        <div class="pagination">
+          <button [disabled]="currentPage === 1" (click)="goPage(currentPage - 1)">‹</button>
+          @if (currentPage > 3) { <button (click)="goPage(1)">1</button> <span>…</span> }
+          @for (p of pages(); track p) {
+            <button [class.active]="p === currentPage" (click)="goPage(p)">{{ p }}</button>
+          }
+          @if (result && currentPage < result.total_pages - 2) { <span>…</span> <button (click)="goPage(result.total_pages)">{{ result.total_pages }}</button> }
+          <button [disabled]="!result || currentPage === result.total_pages" (click)="goPage(currentPage + 1)">›</button>
+        </div>
+      } @else {
+        <div class="empty-state"><h3>No products found</h3><p>Try clearing your filters.</p></div>
+      }
+    </div>
+  </div>
+</div>

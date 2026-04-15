@@ -1,0 +1,23 @@
+app inventory-svc
+  exec     /opt/sovereign-market/bin/inventory-svc
+  port     8002
+  replicas 2
+
+  env {
+    PORT 8002
+    RUST_LOG info
+  }
+
+  health {
+    check    GET /health 200
+    interval 10s
+    timeout  3s
+    retries  3
+  }
+
+  scale {
+    min       1
+    max       4
+    cpu-above 70
+    cpu-below 20
+  }

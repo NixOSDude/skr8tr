@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="We deployed a live Skr8tr mesh on GCP — three VMs, a conductor, two worker nodes, and a live status page served by the orchestrator itself. No Kubernetes. No Docker. No YAML." />
+  <link rel="icon" type="image/svg+xml" href="/skr8tr.svg" />
+  <title>Live Mesh on GCP: Three VMs, No Kubernetes — Skr8tr Blog</title>
+  <style>
+    :root {
+      --bg: #080c10; --bg2: #0c1018; --bg3: #10141e;
+      --border: #1a2030; --text: #d0d8e8; --muted: #607090;
+      --cyan: #00d4ff; --green: #30d890; --orange: #f07840;
+      --font-mono: 'Courier New', Courier, monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: var(--font-sans); font-size: 16px; line-height: 1.8; }
+    a { color: var(--cyan); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(8,12,16,0.94); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem; height: 56px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-brand { height: 28px; width: auto; }
+    .nav-links { display: flex; gap: 1.5rem; list-style: none; }
+    .nav-links a { color: var(--muted); font-size: 0.88rem; }
+    .nav-links a:hover { color: var(--text); text-decoration: none; }
+    .post { max-width: 740px; margin: 0 auto; padding: 5rem 2rem 6rem; }
+    .post-meta { font-family: var(--font-mono); font-size: 0.78rem; color: var(--muted); margin-bottom: 2rem; }
+    .post-meta span { color: var(--cyan); margin-right: 1rem; }
+    h1 { font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 800; line-height: 1.15; margin-bottom: 1.5rem; letter-spacing: -0.02em; }
+    h2 { font-size: 1.4rem; font-weight: 700; margin: 3rem 0 1rem; color: var(--text); }
+    h3 { font-size: 1.1rem; font-weight: 600; margin: 2rem 0 0.75rem; color: var(--cyan); font-family: var(--font-mono); }
+    p { margin-bottom: 1.4rem; color: var(--muted); }
+    p strong { color: var(--text); }
+    .lead { font-size: 1.15rem; color: var(--text); margin-bottom: 2rem; line-height: 1.7; }
+    pre, code { font-family: var(--font-mono); }
+    code { background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; padding: 0.1em 0.4em; font-size: 0.85em; color: var(--cyan); }
+    pre { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem 1.5rem; overflow-x: auto; margin: 1.5rem 0; }
+    pre code { background: none; border: none; padding: 0; font-size: 0.85rem; color: var(--green); line-height: 1.7; }
+    .screenshot { margin: 2.5rem 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; box-shadow: 0 24px 64px rgba(0,0,0,0.5); }
+    .screenshot img { display: block; width: 100%; height: auto; }
+    .screenshot-caption { background: var(--bg2); padding: 0.75rem 1rem; font-family: var(--font-mono); font-size: 0.78rem; color: var(--muted); border-top: 1px solid var(--border); }
+    .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap: 1rem; margin: 2rem 0; }
+    .stat { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; text-align: center; }
+    .stat-val { font-size: 2rem; font-weight: 800; color: var(--cyan); font-family: var(--font-mono); }
+    .stat-label { font-size: 0.78rem; color: var(--muted); margin-top: 0.3rem; text-transform: uppercase; letter-spacing: 0.06em; }
+    hr { border: none; border-top: 1px solid var(--border); margin: 3rem 0; }
+    .back-link { display: inline-block; margin-bottom: 2.5rem; font-family: var(--font-mono); font-size: 0.82rem; color: var(--muted); }
+    .back-link:hover { color: var(--text); text-decoration: none; }
+    footer { text-align: center; padding: 2rem; font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--border); }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="/"><img class="nav-brand" src="/skr8tr.svg" alt="Skr8tr" /></a>
+  <ul class="nav-links">
+    <li><a href="/#why">Why</a></li>
+    <li><a href="/#features">Features</a></li>
+    <li><a href="/#install">Install</a></li>
+    <li><a href="/#enterprise">Enterprise</a></li>
+    <li><a href="/blog/">Blog</a></li>
+  </ul>
+</nav>
+
+<div class="post">
+
+  <a class="back-link" href="/blog/">← All posts</a>
+
+  <div class="post-meta">
+    <span>// DEPLOYMENT</span>
+    April 15, 2026
+  </div>
+
+  <h1>Live Mesh on GCP: Three VMs, No Kubernetes</h1>
+
+  <p class="lead">
+    We deployed a production-grade Skr8tr mesh on Google Cloud Platform — a conductor,
+    two worker nodes, post-quantum authentication, and a live status page served by the
+    orchestrator itself. No Kubernetes. No Docker. No YAML. No control plane overhead.
+  </p>
+
+  <div class="stat-row">
+    <div class="stat"><div class="stat-val">3</div><div class="stat-label">VMs total</div></div>
+    <div class="stat"><div class="stat-val">15MB</div><div class="stat-label">Control plane RAM</div></div>
+    <div class="stat"><div class="stat-val">&lt;1s</div><div class="stat-label">Workload dispatch</div></div>
+    <div class="stat"><div class="stat-val">ML-DSA-65</div><div class="stat-label">PQC auth on every command</div></div>
+  </div>
+
+  <h2>What We Built</h2>
+
+  <p>
+    The mesh runs on three GCP VMs in <code>us-central1-a</code> on a dedicated VPC
+    (<code>10.10.0.0/24</code>):
+  </p>
+
+  <pre><code>skr8tr-conductor   e2-small   10.10.0.10   skr8tr_sched + skr8tr_reg
+skr8tr-node-1      n2-std-2   10.10.0.11   skr8tr_node
+skr8tr-node-2      n2-std-2   10.10.0.12   skr8tr_node</code></pre>
+
+  <p>
+    The conductor runs the scheduler (<code>skr8tr_sched</code>) and service registry
+    (<code>skr8tr_reg</code>). The two worker nodes each run <code>skr8tr_node</code>,
+    which connects to the conductor over UDP, sends heartbeats with CPU and RAM availability,
+    and receives workload dispatch commands.
+  </p>
+
+  <p>
+    <strong>There is no master.</strong> The conductor is a scheduler process — it can run
+    on any node. If it restarts, the worker nodes re-register automatically. If a worker
+    dies, the conductor reschedules its workloads. No etcd. No leader election. No quorum.
+  </p>
+
+  <h2>The Live Status Page</h2>
+
+  <p>
+    The demo page running at the time of this post is itself a Skr8tr workload — a small
+    C HTTP daemon (<code>skr8tr_demo</code>, ~300 lines) that on each request queries the
+    conductor for live mesh state and returns a styled HTML page. It refreshes every 5 seconds.
+  </p>
+
+  <div class="screenshot">
+    <img src="/img/live-mesh-demo.png" alt="Skr8tr Live Mesh Status dashboard showing conductor, two worker nodes, and three running workloads" />
+    <div class="screenshot-caption">
+      Live mesh status — conductor responding, two nodes registered, three workloads running.
+      The page you're looking at is one of those workloads.
+    </div>
+  </div>
+
+  <p>
+    Deployed with a single manifest:
+  </p>
+
+  <pre><code>app skr8tr-demo
+  exec /usr/local/bin/skr8tr_demo
+  args --host 10.10.0.10 --port 8080
+  port 8080
+  replicas 1</code></pre>
+
+  <p>
+    One command. The conductor picked the least-loaded node, sent the dispatch over UDP,
+    the node launched the process, and the demo was live within a second.
+  </p>
+
+  <h2>Post-Quantum Auth in Practice</h2>
+
+  <p>
+    Every <code>skr8tr up</code>, <code>skr8tr down</code>, and <code>skr8tr list</code>
+    command is signed with an ML-DSA-65 private key before it reaches the conductor.
+    The conductor verifies the signature against the registered public key before executing
+    anything. Unsigned commands are rejected with <code>UNAUTHORIZED</code>.
+  </p>
+
+  <pre><code># Generate a keypair (ML-DSA-65, NIST FIPS 204)
+skrtrkey keygen
+# → skrtrview.pub   (1952 bytes, deploy alongside conductor)
+# → ~/.skr8tr/signing.sec   (4032 bytes, operator keeps this)
+
+# Every command auto-signs with your key
+skr8tr up app.skr8tr</code></pre>
+
+  <p>
+    There are no passwords. No TLS certificate rotation schedules. No PKI to maintain.
+    The keypair is generated once and the identity is permanent until you rotate it.
+  </p>
+
+  <h2>One Discovery Problem We Fixed</h2>
+
+  <p>
+    GCP VPC networks do not forward UDP broadcast packets — <code>255.255.255.255</code>
+    is dropped at the hypervisor layer. Skr8tr's original heartbeat implementation used
+    <code>INADDR_BROADCAST</code> for node discovery, which works on physical LANs but
+    silently fails on every major cloud VPC.
+  </p>
+
+  <p>
+    The fix is clean: when <code>--conductor &lt;ip&gt;</code> is specified, heartbeats
+    are sent as unicast directly to that IP instead of broadcast. Broadcast is preserved
+    as the fallback for local network deployments where the conductor address isn't known
+    in advance.
+  </p>
+
+  <pre><code># On-prem / LAN — conductor IP not needed, broadcast discovery works
+skr8tr_node &
+
+# Cloud / VPC — specify conductor IP for unicast heartbeats
+skr8tr_node --conductor 10.10.0.10 &</code></pre>
+
+  <p>
+    <strong>One flag. Cloud-native without any architectural compromise.</strong>
+  </p>
+
+  <h2>No Docker, No OCI — Bare Processes</h2>
+
+  <p>
+    Every workload on this mesh is a native binary running directly on the host.
+    No container runtime. No image layers. No overlay filesystem. When the conductor
+    dispatches a workload, the node does the equivalent of:
+  </p>
+
+  <pre><code>execv("/usr/local/bin/skr8tr_demo", argv);</code></pre>
+
+  <p>
+    The process starts. It runs. Skr8tr tracks its PID, health-checks it if configured,
+    and restarts it on failure. That's the entire runtime model. No daemon overhead,
+    no cgroup setup, no network namespace creation. <strong>Cold deploy time under one second.</strong>
+  </p>
+
+  <h2>Machine Images Next</h2>
+
+  <p>
+    Now that the mesh is verified, the next step is baking GCP machine images — one for
+    the conductor role and one for worker nodes. Every dependency (liboqs, all daemons,
+    systemd units) will be baked into the image. Spinning up a new node becomes:
+    boot from image → register with conductor → receive workloads. No provisioning scripts.
+    No package managers at runtime. No external dependencies.
+  </p>
+
+  <p>
+    This is how production Skr8tr clusters will deploy: immutable images, self-registering
+    nodes, a conductor that requires no configuration to accept them.
+  </p>
+
+  <hr />
+
+  <p style="font-size:0.88rem;">
+    Questions or want early access to the enterprise edition?
+    <a href="mailto:scottbaker@rusticagentic.agency">scottbaker@rusticagentic.agency</a>
+  </p>
+
+</div>
+
+<footer>
+  &copy; 2026 Skr8tr &nbsp;&bull;&nbsp;
+  <a href="/">Home</a> &nbsp;&bull;&nbsp;
+  <a href="/blog/">Blog</a> &nbsp;&bull;&nbsp;
+  <a href="https://github.com/NixOSDude/skr8tr">GitHub</a>
+</footer>
+
+</body>
+</html>

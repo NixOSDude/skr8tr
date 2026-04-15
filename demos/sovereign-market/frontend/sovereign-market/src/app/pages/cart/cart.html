@@ -1,0 +1,48 @@
+<div class="page">
+  <div class="container" style="padding-top:2rem;padding-bottom:3rem">
+    <h1 style="margin-bottom:2rem">Shopping Cart</h1>
+
+    @if (!cart() || cart()!.items.length === 0) {
+      <div class="empty-state">
+        <div style="font-size:4rem;margin-bottom:1rem">🛒</div>
+        <h3>Your cart is empty</h3>
+        <p>Add some products to get started.</p>
+        <a routerLink="/catalog" class="btn btn-primary mt-3">Browse Products</a>
+      </div>
+    } @else {
+      <div class="cart-layout">
+        <div class="cart-items">
+          @for (item of cart()!.items; track item.product_id) {
+            <div class="cart-item card" style="padding:1.25rem;margin-bottom:1rem">
+              <img [src]="item.image_url" [alt]="item.name" class="item-img" />
+              <div class="item-info">
+                <h4><a [routerLink]="['/product', item.product_id]">{{ item.name }}</a></h4>
+                <p class="text-muted" style="font-size:.85rem">Unit price: \${{ item.price.toFixed(2) }}</p>
+                <p class="text-muted" style="font-size:.85rem">Qty: {{ item.quantity }}</p>
+              </div>
+              <div class="item-right">
+                <strong class="price">\${{ (item.price * item.quantity).toFixed(2) }}</strong>
+                <button class="btn btn-ghost btn-sm" (click)="remove(item.product_id)">Remove</button>
+              </div>
+            </div>
+          }
+          <button class="btn btn-ghost btn-sm" (click)="clear()">Clear cart</button>
+        </div>
+
+        <div class="cart-summary card" style="padding:1.5rem;align-self:start">
+          <h3 style="margin-bottom:1.25rem">Order Summary</h3>
+          <div class="summary-row"><span>Subtotal ({{ cart()!.item_count }} items)</span><strong>\${{ cart()!.subtotal.toFixed(2) }}</strong></div>
+          <div class="summary-row"><span>Shipping</span><strong>{{ cart()!.subtotal > 75 ? 'FREE' : '\$9.99' }}</strong></div>
+          <div class="summary-row"><span>Tax (8.25%)</span><strong>\${{ (cart()!.subtotal * 0.0825).toFixed(2) }}</strong></div>
+          <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0" />
+          <div class="summary-row" style="font-size:1.1rem">
+            <strong>Total</strong>
+            <strong>\${{ (cart()!.subtotal + (cart()!.subtotal > 75 ? 0 : 9.99) + cart()!.subtotal * 0.0825).toFixed(2) }}</strong>
+          </div>
+          <a routerLink="/checkout" class="btn btn-primary w-full mt-3 btn-lg" style="justify-content:center">Proceed to Checkout →</a>
+          <a routerLink="/catalog" class="btn btn-ghost w-full mt-1" style="justify-content:center">Continue Shopping</a>
+        </div>
+      </div>
+    }
+  </div>
+</div>

@@ -1059,6 +1059,42 @@ skr8tr audit-verify      <span class="comment"># walk full chain — returns OK 
 
 <hr class="divider" />
 
+<!-- LIVE DEMO -->
+<section id="live-demo">
+  <div class="section-label">// LIVE DEMO</div>
+  <h2>A real mesh. Running right now.</h2>
+  <p class="section-sub">
+    Three GCP VMs. No Kubernetes. No Docker. No control plane. Just Skr8tr — conductor, two worker nodes,
+    and a live workload dispatching system. The status page below is itself a workload managed by Skr8tr,
+    served by a C daemon we wrote in an afternoon.
+  </p>
+  <div style="margin-top:2.5rem; text-align:center;">
+    <a href="/img/live-mesh-demo.png" target="_blank" style="display:inline-block; border:1px solid var(--border); border-radius:10px; overflow:hidden; box-shadow:0 24px 64px rgba(0,0,0,0.5); max-width:860px; width:100%;">
+      <img src="/img/live-mesh-demo.png" alt="Skr8tr Live Mesh Status — conductor responding, two worker nodes registered, three workloads running"
+           style="display:block; width:100%; height:auto;" />
+    </a>
+    <p style="margin-top:1.2rem; font-family:var(--font-mono); font-size:0.8rem; color:var(--muted);">
+      Conductor &bull; 2 worker nodes &bull; 3 workloads &bull; auto-refresh every 5s &bull; served by Skr8tr
+    </p>
+  </div>
+  <div style="margin-top:3rem; display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:1.5rem; max-width:860px; margin-left:auto; margin-right:auto;">
+    <div style="background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:1.5rem;">
+      <div style="font-family:var(--font-mono); font-size:0.72rem; color:var(--cyan); text-transform:uppercase; letter-spacing:0.1em; margin-bottom:0.75rem;">What you're seeing</div>
+      <p style="font-size:0.9rem; color:var(--muted); line-height:1.7;">A live Skr8tr mesh on GCP. The conductor schedules workloads across worker nodes over UDP. No etcd. No leader election. No SPOF. The entire control plane is three binaries.</p>
+    </div>
+    <div style="background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:1.5rem;">
+      <div style="font-family:var(--font-mono); font-size:0.72rem; color:var(--green); text-transform:uppercase; letter-spacing:0.1em; margin-bottom:0.75rem;">The demo server itself</div>
+      <p style="font-size:0.9rem; color:var(--muted); line-height:1.7;">The live status page is a Skr8tr workload — a small C HTTP daemon deployed with one manifest file. Skr8tr dispatched it to a worker node, tracks its health, and will restart it if it dies.</p>
+    </div>
+    <div style="background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:1.5rem;">
+      <div style="font-family:var(--font-mono); font-size:0.72rem; color:var(--orange); text-transform:uppercase; letter-spacing:0.1em; margin-bottom:0.75rem;">PQC on every command</div>
+      <p style="font-size:0.9rem; color:var(--muted); line-height:1.7;">Every <code style="color:var(--cyan)">skr8tr up</code> command is signed with ML-DSA-65 before the conductor touches it. The nodes verify signatures on the mesh. There are no passwords, no TLS certs to rotate.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
 <!-- ENTERPRISE -->
 <hr class="divider" />
 <div id="enterprise" class="enterprise-section">
