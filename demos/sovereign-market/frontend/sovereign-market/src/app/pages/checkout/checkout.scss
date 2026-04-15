@@ -1,4 +1,0 @@
-.checkout-layout { display:grid;grid-template-columns:1fr 340px;gap:2rem; }
-.addr-row { display:flex;gap:.75rem; }
-.summary-item { display:flex;justify-content:space-between;margin-bottom:.5rem;font-size:.9rem; }
-@media (max-width:768px) { .checkout-layout{grid-template-columns:1fr;} }

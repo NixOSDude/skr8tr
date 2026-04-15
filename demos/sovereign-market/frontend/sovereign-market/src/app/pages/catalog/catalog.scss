@@ -1,4 +1,0 @@
-.catalog-layout { display: grid; grid-template-columns: 240px 1fr; gap: 2rem; }
-.catalog-main { min-width: 0; }
-.results-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; }
-@media (max-width: 768px) { .catalog-layout { grid-template-columns: 1fr; } .filters-sidebar { order: -1; } }

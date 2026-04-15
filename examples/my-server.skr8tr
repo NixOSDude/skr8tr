@@ -1,5 +1,0 @@
-app my-server
-  type process
-  exec /bin/sleep
-  args 3600
-  replicas 1
