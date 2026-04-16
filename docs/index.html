@@ -477,6 +477,7 @@
   <ul class="nav-links">
     <li><a href="#why">Why</a></li>
     <li><a href="#features">Features</a></li>
+    <li><a href="#web-platforms">Web Platforms</a></li>
     <li><a href="#enterprise" style="color:var(--gold)">Platform</a></li>
     <li><a href="#live-demo">Live Demo</a></li>
     <li><a href="mailto:scottbaker@rusticagentic.agency?subject=Skr8tr%20Demo%20Request" style="color:var(--green)">Request Demo</a></li>
@@ -934,6 +935,97 @@
 
 <hr class="divider" />
 
+<!-- WEB PLATFORM SERVICES -->
+<section id="web-platforms">
+  <div class="section-label">// WEB PLATFORM SERVICES</div>
+  <h2>Your frontend, on your infrastructure.<br>We build the foundation.</h2>
+  <p class="section-sub">
+    We scaffold production-ready frontend projects wired directly to your microservices — Skr8tr ingress pre-configured, API routing set up, auth hooked in.
+    You get a running baseline in your stack of choice and you flesh it out with your design, your content, your brand.
+    No templates. No page builders. Real code, your team owns it from day one.
+  </p>
+
+  <div style="overflow-x:auto;margin-bottom:2.5rem;">
+    <table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
+      <thead>
+        <tr style="border-bottom:1px solid var(--border);">
+          <th style="text-align:left;padding:0.8rem 1rem;color:var(--muted);font-weight:600;">Framework</th>
+          <th style="text-align:left;padding:0.8rem 1rem;color:var(--muted);font-weight:600;">Best for</th>
+          <th style="text-align:left;padding:0.8rem 1rem;color:var(--muted);font-weight:600;">Rendering</th>
+          <th style="text-align:left;padding:0.8rem 1rem;color:var(--muted);font-weight:600;">Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom:1px solid rgba(26,32,48,0.6);">
+          <td style="padding:0.75rem 1rem;color:var(--cyan);font-weight:700;">Next.js</td>
+          <td style="padding:0.75rem 1rem;color:var(--text);">Enterprise SaaS, e-commerce, SEO-critical apps</td>
+          <td style="padding:0.75rem 1rem;color:var(--muted);">SSR + SSG + Streaming</td>
+          <td style="padding:0.75rem 1rem;color:var(--muted);">React Server Components call your microservices server-side — APIs never exposed to the browser</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(26,32,48,0.6);">
+          <td style="padding:0.75rem 1rem;color:var(--green);font-weight:700;">SvelteKit</td>
+          <td style="padding:0.75rem 1rem;color:var(--text);">Fast-moving teams, clean codebases, microservice-per-route</td>
+          <td style="padding:0.75rem 1rem;color:var(--muted);">SSR + SSG + CSR</td>
+          <td style="padding:0.75rem 1rem;color:var(--muted);">Each route's <code>load()</code> function maps 1:1 to a microservice. Smallest runtime, fastest output.</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(26,32,48,0.6);">
+          <td style="padding:0.75rem 1rem;color:var(--gold);font-weight:700;">Angular</td>
+          <td style="padding:0.75rem 1rem;color:var(--text);">Large teams, strict TypeScript, complex dashboards</td>
+          <td style="padding:0.75rem 1rem;color:var(--muted);">CSR + SSR (Universal)</td>
+          <td style="padding:0.75rem 1rem;color:var(--muted);">Strong structure enforced by the framework. Excellent for teams that need discipline at scale.</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(26,32,48,0.6);">
+          <td style="padding:0.75rem 1rem;color:var(--orange);font-weight:700;">Astro</td>
+          <td style="padding:0.75rem 1rem;color:var(--text);">Content sites, marketing, storefronts, docs</td>
+          <td style="padding:0.75rem 1rem;color:var(--muted);">SSG + Islands</td>
+          <td style="padding:0.75rem 1rem;color:var(--muted);">Zero JS by default. Dynamic islands (React/Svelte/Vue) only where needed. Fastest possible page loads.</td>
+        </tr>
+        <tr>
+          <td style="padding:0.75rem 1rem;color:var(--purple,#b48eff);font-weight:700;">Remix</td>
+          <td style="padding:0.75rem 1rem;color:var(--text);">E-commerce, data-heavy apps, form-heavy workflows</td>
+          <td style="padding:0.75rem 1rem;color:var(--muted);">SSR + Progressive</td>
+          <td style="padding:0.75rem 1rem;color:var(--muted);">Every route has a server loader and action — maps cleanly to your cart, order, and user microservices.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:2rem 2.2rem;margin-bottom:2rem;">
+    <div class="section-label" style="margin-bottom:0.8rem;">// WHAT WE BUILD FOR YOU</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1.2rem;margin-bottom:1.4rem;">
+      <div>
+        <p style="font-size:0.84rem;font-weight:700;color:var(--text);margin-bottom:0.5rem;">Scaffolded project</p>
+        <p style="font-size:0.84rem;color:var(--muted);line-height:1.7;">A clean, production-structured project in your chosen framework. Routing set up. Build pipeline configured. Deployed and serving traffic through Skr8tr ingress from day one.</p>
+      </div>
+      <div>
+        <p style="font-size:0.84rem;font-weight:700;color:var(--text);margin-bottom:0.5rem;">Microservice integration</p>
+        <p style="font-size:0.84rem;color:var(--muted);line-height:1.7;">Your backend microservices wired in as typed API clients. Auth tokens threaded through. Error boundaries, loading states, and retry logic built out. You never touch the plumbing.</p>
+      </div>
+      <div>
+        <p style="font-size:0.84rem;font-weight:700;color:var(--text);margin-bottom:0.5rem;">Ingress + routing</p>
+        <p style="font-size:0.84rem;color:var(--muted);line-height:1.7;">Skr8tr ingress pre-configured for your route map. TLS, HTTPS redirect, and API path routing set up. Frontend and backend services all behind one domain — no CORS, no API gateway to manage.</p>
+      </div>
+      <div>
+        <p style="font-size:0.84rem;font-weight:700;color:var(--text);margin-bottom:0.5rem;">Your team takes over</p>
+        <p style="font-size:0.84rem;color:var(--muted);line-height:1.7;">We hand you a working, documented, deployable baseline. Your developers add the design, components, and content. You own the code completely — no vendor dependency on us after handoff.</p>
+      </div>
+    </div>
+  </div>
+
+  <div style="max-width:640px;margin:0 auto;text-align:center;background:rgba(0,212,255,0.04);border:1px solid rgba(0,212,255,0.2);border-radius:12px;padding:2rem 2.2rem;">
+    <div class="section-label" style="margin-bottom:0.8rem;">// START WITH A CONSULTATION</div>
+    <p style="color:var(--muted);font-size:0.92rem;line-height:1.7;margin-bottom:1.4rem;">
+      Before we scope anything, tell us about your project — what you're building, who your users are,
+      your team's existing skills, and any design direction you already have.
+      That conversation shapes everything. No boilerplate. No generic starter kit.
+    </p>
+    <a class="btn-enterprise solid" href="mailto:scottbaker@rusticagentic.agency?subject=Skr8tr%20Web%20Platform%20Consultation">Request a Web Platform Consultation &rarr;</a>
+    <p style="margin-top:1rem;font-size:0.82rem;color:var(--muted);">All serious inquiries answered within 24 hours.</p>
+  </div>
+</section>
+
+<hr class="divider" />
+
 <!-- ENTERPRISE -->
 <hr class="divider" />
 <div id="enterprise" class="enterprise-section">
@@ -1033,6 +1125,7 @@
     <strong style="color:var(--cyan)">skr8tr</strong> &nbsp;&bull;&nbsp;
     <a href="#live-demo" style="color:var(--green)">Live Demo</a> &nbsp;&bull;&nbsp;
     <a href="#features">Features</a> &nbsp;&bull;&nbsp;
+    <a href="#web-platforms">Web Platforms</a> &nbsp;&bull;&nbsp;
     <a href="#enterprise" style="color:var(--gold)">Platform</a> &nbsp;&bull;&nbsp;
     <a href="mailto:scottbaker@rusticagentic.agency">Contact</a>
   </p>
