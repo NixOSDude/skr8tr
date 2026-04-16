@@ -1,6 +1,0 @@
-.footer { background: #1e293b; color: #94a3b8; margin-top: 4rem; padding: 3rem 0 0; }
-.footer-inner { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 2rem; padding-bottom: 2rem; }
-.footer-brand { .brand-icon { font-size: 1.4rem; } strong { font-size: 1.1rem; color: #fff; margin-left: .4rem; } p { font-size: .85rem; } a { color: #60a5fa; } }
-.footer-links { h4 { color: #fff; font-size: .88rem; font-weight: 600; margin-bottom: .8rem; } a { display: block; color: #94a3b8; font-size: .85rem; margin-bottom: .4rem; &:hover { color: #fff; } } }
-.footer-bottom { border-top: 1px solid #334155; padding: 1rem 1.5rem; text-align: center; font-size: .82rem; p { margin: 0; } strong { color: #60a5fa; } }
-@media (max-width: 768px) { .footer-inner { grid-template-columns: 1fr 1fr; } }

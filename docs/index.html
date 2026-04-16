@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Skr8tr — The sovereign workload orchestrator. Run microservices on bare metal or cloud clusters. No Docker. No YAML. No Kubernetes. 5MB control plane." />
-  <meta property="og:title" content="Skr8tr — The k8s Killer" />
-  <meta property="og:description" content="Sovereign workload orchestration. No Docker. No YAML. No Kubernetes. PQC-signed commands. 5MB control plane." />
+  <meta name="description" content="Skr8tr — The sovereign web microservices orchestrator. Ship services like a web developer. No Docker. No YAML. No Kubernetes. Post-quantum auth. 5MB control plane." />
+  <meta property="og:title" content="Skr8tr — Sovereign Orchestration for Web Teams" />
+  <meta property="og:description" content="Deploy web microservices without Kubernetes. PQC-signed commands. Built-in HTTP/2 ingress. 5MB control plane. See it live at demo.skr8tr.online." />
   <meta property="og:type" content="website" />
   <link rel="icon" type="image/svg+xml" href="/skr8tr.svg" />
-  <title>Skr8tr — The Sovereign Orchestrator</title>
+  <title>Skr8tr — Sovereign Web Microservices Platform</title>
   <style>
     :root {
       --bg:        #080c10;
@@ -482,7 +482,7 @@
     <li><a href="#arch">Architecture</a></li>
     <li><a href="#enterprise" style="color:var(--gold)">Enterprise</a></li>
     <li><a href="/blog/">Blog</a></li>
-    <li><a href="https://github.com/NixOSDude/skr8tr">GitHub</a></li>
+    <li><a href="https://demo.skr8tr.online" target="_blank" style="color:var(--green)">Live Demo ↗</a></li>
   </ul>
 </nav>
 
@@ -491,9 +491,7 @@
   <span class="blog-strip-label">&#x25B6; FROM THE BLOG:</span>
   <a class="bs-orange" href="/blog/why-we-killed-kubernetes.html">Why We Killed Our Kubernetes Cluster</a>
   <span class="sep">|</span>
-  <a class="bs-cyan" href="/blog/http-ingress-in-320-lines-of-c.html">HTTP Ingress in 320 Lines of C23</a>
-  <span class="sep">|</span>
-  <a class="bs-green" href="/blog/post-quantum-auth-no-passwords.html">Post-Quantum Auth — No Passwords</a>
+  <a class="bs-cyan" href="/blog/post-quantum-auth-no-passwords.html">Post-Quantum Auth — No Passwords</a>
   <span class="sep">|</span>
   <a class="bs-gold" href="/blog/rolling-updates-without-readiness-probes.html">Rolling Updates Without ReadinessProbes</a>
   <span class="sep">|</span>
@@ -504,16 +502,16 @@
 
 <!-- HERO -->
 <div class="hero">
-  <div class="hero-badge">&#x26A1; OPEN SOURCE &nbsp;&bull;&nbsp; C23 + RUST &nbsp;&bull;&nbsp; POST-QUANTUM AUTH &nbsp;&bull;&nbsp; HIPAA / PCI DSS READY</div>
+  <div class="hero-badge">&#x26A1; PROPRIETARY &nbsp;&bull;&nbsp; C23 + RUST &nbsp;&bull;&nbsp; POST-QUANTUM AUTH &nbsp;&bull;&nbsp; BUILT FOR WEB TEAMS &nbsp;&bull;&nbsp; HIPAA / PCI DSS READY</div>
   <img src="/skr8tr.svg" alt="skr8tr" width="480" height="119" style="max-width:min(480px,85vw);height:auto;margin-bottom:1.2rem;" />
   <p class="hero-tagline">
-    The <strong>sovereign workload orchestrator.</strong><br>
-    No Docker. No YAML. No Kubernetes.<br>
-    5 MB control plane. PQC-signed commands.
+    The <strong>orchestrator built for web developers.</strong><br>
+    Deploy microservices fast. Stay compliant. Sleep at night.<br>
+    <span style="font-size:0.9em;opacity:0.75;">5 MB control plane &bull; PQC-signed commands &bull; No Docker &bull; No YAML &bull; No k8s</span>
   </p>
   <div class="hero-actions">
-    <a class="btn btn-primary" href="#install">Get Started</a>
-    <a class="btn btn-secondary" href="https://github.com/NixOSDude/skr8tr">View on GitHub &rarr;</a>
+    <a class="btn btn-primary" href="https://demo.skr8tr.online" target="_blank">See It Live ↗</a>
+    <a class="btn btn-secondary" href="mailto:scottbaker@rusticagentic.agency?subject=Skr8tr%20Inquiry">Request Access &rarr;</a>
   </div>
 
   <!-- Terminal demo -->
@@ -581,11 +579,11 @@
 <!-- WHY -->
 <section id="why">
   <div class="section-label">// WHY SKR8TR</div>
-  <h2>Kubernetes is a tax on your infrastructure.</h2>
+  <h2>Kubernetes is an infrastructure problem.<br>Web teams have a shipping problem.</h2>
   <p class="section-sub">
-    k8s was designed for Google's scale in 2014. Most teams don't need a 600 MB control plane,
-    etcd consensus, iptables mazes, and 200-line YAML manifests to run a React app and an API server.
-    Skr8tr cuts through it.
+    You know how to build services. You shouldn't need to become a platform engineer to run them.
+    k8s was built for Google's scale in 2014. Skr8tr was built for web teams who have outgrown
+    a single server but aren't Google. Three binaries. Any Linux host. Up in five minutes.
   </p>
   <div class="comparison">
     <div class="comp-card them">
@@ -706,8 +704,8 @@
         <tr style="background:rgba(48,216,144,0.05);border-top:2px solid rgba(48,216,144,0.25);">
           <td style="padding:1rem;color:var(--text);font-weight:700;">Total / mo</td>
           <td style="padding:1rem;text-align:right;color:var(--red);font-weight:700;font-size:1.05rem;">~$11,680</td>
-          <td style="padding:1rem;text-align:right;color:var(--cyan);font-weight:700;font-size:1.05rem;">~$1,400<br><small style="color:var(--muted);font-weight:400;font-size:0.75rem;">open source — $0 license</small></td>
-          <td style="padding:1rem;text-align:right;color:var(--gold);font-weight:700;font-size:1.05rem;">~$2,900<br><small style="color:var(--muted);font-weight:400;font-size:0.75rem;">open source — $0 license</small></td>
+          <td style="padding:1rem;text-align:right;color:var(--cyan);font-weight:700;font-size:1.05rem;">~$1,400<br><small style="color:var(--muted);font-weight:400;font-size:0.75rem;">Hetzner bare metal</small></td>
+          <td style="padding:1rem;text-align:right;color:var(--gold);font-weight:700;font-size:1.05rem;">~$2,900<br><small style="color:var(--muted);font-weight:400;font-size:0.75rem;">AWS EC2 — no EKS fee</small></td>
           <td style="padding:1rem;text-align:right;color:var(--green);font-weight:700;font-size:1.1rem;">$8,780–$10,280<br><small style="color:var(--green);font-weight:400;font-size:0.78rem;">$105k–$123k / year</small></td>
         </tr>
       </tbody>
@@ -745,9 +743,9 @@
 
 <!-- FEATURES -->
 <section id="features">
-  <div class="section-label">// OPEN SOURCE — APACHE 2.0 — FREE FOREVER</div>
-  <h2>Everything you need.<br>Nothing you don't.</h2>
-  <p class="section-sub">Every feature below ships in the open-source build — no license key, no call required. Enterprise features (RBAC, audit ledger, SSO, multi-tenancy) are listed separately <a href="#enterprise">below</a>.</p>
+  <div class="section-label">// PLATFORM FEATURES — COMPLETE PACKAGE</div>
+  <h2>Everything a web team needs.<br>Nothing you don't.</h2>
+  <p class="section-sub">Every feature below ships in the complete Skr8tr platform — orchestration, ingress, service discovery, PQC auth, compliance, and autoscaling as one sovereign stack. No assembling a toolchain. No Helm charts. No vendor add-ons.</p>
   <div class="feat-grid">
     <div class="feat-card">
       <div class="feat-icon">&#x1F510;</div>
@@ -849,11 +847,11 @@
   <!-- Enterprise callout -->
   <div style="margin-top:2.5rem;background:rgba(240,176,32,0.05);border:1px solid rgba(240,176,32,0.25);border-radius:12px;padding:1.8rem 2rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1.2rem;">
     <div>
-      <div style="font-family:var(--font-mono);font-size:0.75rem;color:var(--gold);letter-spacing:0.1em;margin-bottom:0.5rem;">// ENTERPRISE ADD-ONS</div>
-      <p style="color:var(--text);font-weight:600;font-size:1rem;margin-bottom:0.3rem;">Need RBAC, Audit Ledger, SSO, or Multi-Tenancy?</p>
-      <p style="color:var(--muted);font-size:0.88rem;">Those are closed-source enterprise modules — built, tested, and ready to deploy on top of the open-source core.</p>
+      <div style="font-family:var(--font-mono);font-size:0.75rem;color:var(--gold);letter-spacing:0.1em;margin-bottom:0.5rem;">// ENTERPRISE PLATFORM</div>
+      <p style="color:var(--text);font-weight:600;font-size:1rem;margin-bottom:0.3rem;">RBAC, Audit Ledger, SSO, Multi-Tenancy &amp; Autoscaling — all included.</p>
+      <p style="color:var(--muted);font-size:0.88rem;">Not bolt-ons. Not a separate SKU. The enterprise layer ships as part of the complete Skr8tr platform — deployed, licensed, and supported as one stack.</p>
     </div>
-    <a class="btn-enterprise solid" href="#enterprise" style="white-space:nowrap;">See Enterprise Features &rarr;</a>
+    <a class="btn-enterprise solid" href="#enterprise" style="white-space:nowrap;">See the Full Platform &rarr;</a>
   </div>
 </section>
 
@@ -976,84 +974,67 @@
 
 <hr class="divider" />
 
-<!-- INSTALL -->
+<!-- HOW IT WORKS -->
 <section id="install">
-  <div class="section-label">// QUICK START</div>
-  <h2>Up in five minutes.</h2>
-  <p class="section-sub">Build from source, run three daemons, deploy your first workload.</p>
+  <div class="section-label">// HOW IT WORKS</div>
+  <h2>Write a manifest.<br>Deploy in seconds.</h2>
+  <p class="section-sub">Skr8tr ships as pre-built binaries for your target platform. You get the Conductor, two worker node daemons, the CLI, and the ingress — everything configured, licensed, and ready. Here is what day one looks like.</p>
 
   <div class="install-steps">
     <div class="install-step">
       <div class="step-num">1</div>
       <div class="step-body">
-        <h4>Clone and build</h4>
-        <div class="code-block">
-git clone https://github.com/NixOSDude/skr8tr
-cd skr8tr
-nix develop          <span class="comment"># pins gcc, liboqs, openssl — recommended</span>
-make                 <span class="comment"># builds all daemons + CLI into bin/</span></div>
-        <div style="color:var(--muted);font-size:0.84rem;margin-top:0.5rem;">No Nix? Install gcc (C23), liboqs ≥ 0.15, openssl ≥ 3.0 manually then run <code>make</code>.</div>
+        <h4>You receive pre-built, signed binaries for your platform</h4>
+        <p>No compiler setup. No Nix. No build toolchain. Skr8tr ships as a set of pre-built, patchelf-clean binaries for Linux x86-64 or ARM64. Drop them on any host, set executable, done. PQC signing keys are generated on your machine — they never leave it.</p>
       </div>
     </div>
     <div class="install-step">
       <div class="step-num">2</div>
       <div class="step-body">
-        <h4>Generate your signing keypair (once per operator machine)</h4>
+        <h4>Write a six-line manifest for each service</h4>
         <div class="code-block">
-bin/skrtrkey keygen
-<span class="comment"># → skrtrview.pub          (1952 bytes) — place alongside skr8tr_sched</span>
-<span class="comment"># → ~/.skr8tr/signing.sec  (4032 bytes, chmod 600) — stays on your machine</span></div>
-        <div style="color:var(--muted);font-size:0.84rem;margin-top:0.5rem;"><strong>skrtrview.pub must be in the same directory you launch skr8tr_sched from.</strong> The conductor auto-detects it there — no flag needed.</div>
+<span class="kw">app</span> <span class="val">api-server</span>
+  <span class="kw">exec</span>     <span class="str">/opt/myapp/bin/api</span>
+  <span class="kw">args</span>     <span class="str">--port 8080</span>
+  <span class="kw">port</span>     <span class="val">8080</span>
+  <span class="kw">replicas</span> <span class="val">3</span>
+  <span class="kw">restart</span>  <span class="val">on-failure</span></div>
+        <p style="margin-top:0.6rem;font-size:0.84rem;color:var(--muted);">No YAML. No CRDs. No Helm. The <code>.skr8tr</code> manifest is human-readable and expressive — secrets, volumes, health checks, and autoscale rules in the same file.</p>
       </div>
     </div>
     <div class="install-step">
       <div class="step-num">3</div>
       <div class="step-body">
-        <h4>Start the cluster</h4>
+        <h4>One command deploys across your entire fleet</h4>
         <div class="code-block">
-<span class="comment"># On the conductor/tower host (run from the skr8tr directory):</span>
-nohup bin/skr8tr_reg   > /tmp/tower.log  2>&1 &
-nohup bin/skr8tr_sched > /tmp/sched.log  2>&1 &  <span class="comment"># auto-detects skrtrview.pub</span>
-
-<span class="comment"># On every worker node:</span>
-nohup bin/skr8tr_node  > /tmp/node.log   2>&1 &
-
-<span class="comment"># Optional: HTTP ingress</span>
-nohup bin/skr8tr_ingress --listen 80 --tower conductor-host \
-  --route /api:api-svc --route /:frontend > /tmp/ingress.log 2>&1 &</div>
+<span class="prompt">$</span> <span class="cmd">skr8tr --key ~/.skr8tr/signing.sec up api-server.skr8tr</span>
+<span class="out">&nbsp; submitting api-server... </span><span class="ok">ok</span>
+<span class="out">&nbsp; scheduled → node-1 (10.10.0.11) — 3 replicas launching</span>
+<span class="out">&nbsp; registered in Tower — ingress routing active</span></div>
+        <p style="margin-top:0.6rem;font-size:0.84rem;color:var(--muted);">Every deploy command is ML-DSA-65 signed before it touches the Conductor. No bearer tokens. No passwords. Your signing key stays on your machine.</p>
       </div>
     </div>
     <div class="install-step">
       <div class="step-num">4</div>
       <div class="step-body">
-        <h4>Verify and deploy your first workload</h4>
+        <h4>The ingress routes traffic instantly — no config required</h4>
         <div class="code-block">
-bin/skr8tr ping                                                  <span class="comment"># → [PONG] conductor</span>
-bin/skr8tr nodes                                                 <span class="comment"># → live node list</span>
-bin/skr8tr --key ~/.skr8tr/signing.sec up examples/api.skr8tr   <span class="comment"># deploy</span>
-bin/skr8tr list                                                  <span class="comment"># verify running</span>
-bin/skr8tr logs api-server                                       <span class="comment"># tail logs</span>
-bin/skr8tr exec api-server "env | grep PORT"                    <span class="comment"># remote exec</span></div>
+<span class="comment"># Services register themselves in Tower on launch.</span>
+<span class="comment"># The ingress resolves them on every request — no nginx config, no reload.</span>
+<span class="prompt">$</span> <span class="cmd">skr8tr tower</span>
+<span class="out">&nbsp; api-server      10.10.0.11:8080   ttl=28s   replicas=3</span>
+<span class="out">&nbsp; frontend        10.10.0.12:4200   ttl=25s   replicas=1</span>
+<span class="out">&nbsp; product-svc     10.10.0.12:8001   ttl=27s   replicas=1</span></div>
       </div>
     </div>
-    <div class="install-step" style="display:none">
-      <div class="step-num">5</div>
-      <div class="step-body">
-        <h4>Enable compliance features (HIPAA / PCI DSS environments)</h4>
-        <div class="code-block">
-<span class="comment"># Generate 256-bit audit encryption key (do once)</span>
-openssl rand -out ~/.skr8tr/audit.key 32 &amp;&amp; chmod 600 ~/.skr8tr/audit.key
+  </div>
 
-<span class="comment"># Start Conductor with AES-256-GCM encrypted audit log + SIEM syslog</span>
-nohup bin/skr8tr_sched   --pubkey skrtrview.pub   --audit-key ~/.skr8tr/audit.key   --syslog-host 10.0.0.20 \          <span class="comment"># your SIEM collector IP</span>
-  --syslog-tls \                      <span class="comment"># RFC 5425 TLS transport (HIPAA §164.312(e))</span>
-  --syslog-ca /etc/ssl/siem-ca.pem   &gt; /tmp/sched.log 2&gt;&amp;1 &amp;
-
-<span class="comment"># Verify the audit chain at any time</span>
-skr8tr audit 50          <span class="comment"># tail last 50 entries</span>
-skr8tr audit-verify      <span class="comment"># walk full chain — returns OK or CHAIN BROKEN</span></div>
-      </div>
-    </div>
+  <!-- Demo CTA -->
+  <div style="margin-top:3rem;text-align:center;background:rgba(0,212,255,0.04);border:1px solid rgba(0,212,255,0.2);border-radius:12px;padding:2.5rem 2rem;">
+    <div style="font-family:var(--font-mono);font-size:0.75rem;color:var(--cyan);letter-spacing:0.1em;margin-bottom:0.8rem;">// SEE IT LIVE — RIGHT NOW</div>
+    <h3 style="font-size:1.4rem;font-weight:700;margin-bottom:0.7rem;">9 Rust microservices. Angular SPA. 3 GCP VMs.<br>Running on Skr8tr. No Kubernetes.</h3>
+    <p style="color:var(--muted);font-size:0.92rem;max-width:540px;margin:0 auto 1.8rem;">The Sovereign Market demo is a full e-commerce platform — products, cart, orders, search, reviews, recommendations — all orchestrated by Skr8tr on Google Cloud. Live. Right now.</p>
+    <a class="btn btn-primary" href="https://demo.skr8tr.online" target="_blank" style="font-size:1rem;padding:0.9rem 2.2rem;">Open demo.skr8tr.online ↗</a>
   </div>
 </section>
 
@@ -1061,35 +1042,72 @@ skr8tr audit-verify      <span class="comment"># walk full chain — returns OK 
 
 <!-- LIVE DEMO -->
 <section id="live-demo">
-  <div class="section-label">// LIVE DEMO</div>
-  <h2>A real mesh. Running right now.</h2>
+  <div class="section-label">// LIVE DEMO — SOVEREIGN MARKET</div>
+  <h2>9 microservices. 3 GCP VMs.<br>Zero Kubernetes. Live right now.</h2>
   <p class="section-sub">
-    Three GCP VMs. No Kubernetes. No Docker. No control plane. Just Skr8tr — conductor, two worker nodes,
-    and a live workload dispatching system. The status page below is itself a workload managed by Skr8tr,
-    served by a C daemon we wrote in an afternoon.
+    The Sovereign Market is a production-grade e-commerce demo running on Skr8tr on Google Cloud.
+    Angular SPA frontend. Nine Rust microservices. HTTP/2 ingress with Let's Encrypt TLS.
+    Every service orchestrated, health-checked, and auto-registered in Tower — no Docker, no Kubernetes, no YAML.
   </p>
-  <div style="margin-top:2.5rem; text-align:center;">
-    <a href="/img/live-mesh-demo.png" target="_blank" style="display:inline-block; border:1px solid var(--border); border-radius:10px; overflow:hidden; box-shadow:0 24px 64px rgba(0,0,0,0.5); max-width:860px; width:100%;">
-      <img src="/img/live-mesh-demo.png" alt="Skr8tr Live Mesh Status — conductor responding, two worker nodes registered, three workloads running"
-           style="display:block; width:100%; height:auto;" />
-    </a>
-    <p style="margin-top:1.2rem; font-family:var(--font-mono); font-size:0.8rem; color:var(--muted);">
-      Conductor &bull; 2 worker nodes &bull; 3 workloads &bull; auto-refresh every 5s &bull; served by Skr8tr
-    </p>
+
+  <!-- Stack report -->
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:2rem;font-family:var(--font-mono);font-size:0.84rem;line-height:2;margin-bottom:2.5rem;overflow-x:auto;">
+    <div style="color:var(--muted);font-size:0.72rem;letter-spacing:0.1em;margin-bottom:1rem;">// LIVE GCP CLUSTER — demo.skr8tr.online</div>
+    <div><span style="color:var(--cyan)">Conductor</span>  &nbsp;e2-small &nbsp;&nbsp; 10.10.0.10 &nbsp; <span style="color:var(--green)">34.171.44.13</span> &nbsp;&nbsp; skr8tr_sched · skr8tr_reg · skr8tr_rbac · skr8tr_sso · skr8tr_ingress</div>
+    <div><span style="color:var(--orange)">Node-1</span>  &nbsp;&nbsp;&nbsp;&nbsp;n2-std-2 &nbsp;&nbsp; 10.10.0.11 &nbsp; <span style="color:var(--green)">35.192.183.185</span> &nbsp; skr8tr_node · frontend-svc · cart-svc</div>
+    <div><span style="color:var(--orange)">Node-2</span>  &nbsp;&nbsp;&nbsp;&nbsp;n2-std-2 &nbsp;&nbsp; 10.10.0.12 &nbsp; <span style="color:var(--green)">136.119.17.103</span> &nbsp; skr8tr_node · 9 microservices</div>
+    <div style="margin-top:1rem;border-top:1px solid var(--border);padding-top:1rem;">
+      <span style="color:var(--gold)">Enterprise stack active:</span> &nbsp;HTTP/2 ingress (ALPN) · RBAC · SSO · Audit chain · Multi-tenant conductor · Autoscaler
+    </div>
   </div>
-  <div style="margin-top:3rem; display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:1.5rem; max-width:860px; margin-left:auto; margin-right:auto;">
-    <div style="background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:1.5rem;">
-      <div style="font-family:var(--font-mono); font-size:0.72rem; color:var(--cyan); text-transform:uppercase; letter-spacing:0.1em; margin-bottom:0.75rem;">What you're seeing</div>
-      <p style="font-size:0.9rem; color:var(--muted); line-height:1.7;">A live Skr8tr mesh on GCP. The conductor schedules workloads across worker nodes over UDP. No etcd. No leader election. No SPOF. The entire control plane is three binaries.</p>
+
+  <!-- Service grid -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;margin-bottom:2.5rem;">
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:1.4rem;">
+      <div style="font-family:var(--font-mono);font-size:0.72rem;color:var(--cyan);margin-bottom:0.7rem;">// 9 RUST MICROSERVICES</div>
+      <div style="font-size:0.84rem;color:var(--muted);line-height:2;">
+        product-svc &nbsp;:8001<br>
+        inventory-svc :8002<br>
+        search-svc &nbsp;&nbsp;:8003<br>
+        cart-svc &nbsp;&nbsp;&nbsp;&nbsp;:8004<br>
+        order-svc &nbsp;&nbsp;&nbsp;:8005<br>
+        user-svc &nbsp;&nbsp;&nbsp;&nbsp;:8006<br>
+        review-svc &nbsp;&nbsp;:8007<br>
+        recommendation-svc :8008<br>
+        frontend-svc &nbsp;:4200
+      </div>
     </div>
-    <div style="background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:1.5rem;">
-      <div style="font-family:var(--font-mono); font-size:0.72rem; color:var(--green); text-transform:uppercase; letter-spacing:0.1em; margin-bottom:0.75rem;">The demo server itself</div>
-      <p style="font-size:0.9rem; color:var(--muted); line-height:1.7;">The live status page is a Skr8tr workload — a small C HTTP daemon deployed with one manifest file. Skr8tr dispatched it to a worker node, tracks its health, and will restart it if it dies.</p>
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:1.4rem;">
+      <div style="font-family:var(--font-mono);font-size:0.72rem;color:var(--green);margin-bottom:0.7rem;">// INGRESS ROUTING — PORT 443</div>
+      <div style="font-size:0.84rem;color:var(--muted);line-height:2;">
+        /api/products → product-svc<br>
+        /api/search &nbsp;&nbsp;→ search-svc<br>
+        /api/cart &nbsp;&nbsp;&nbsp;&nbsp;→ cart-svc<br>
+        /api/orders &nbsp;&nbsp;→ order-svc<br>
+        /api/users &nbsp;&nbsp;&nbsp;→ user-svc<br>
+        /api/reviews &nbsp;→ review-svc<br>
+        /api/recommendations → rec-svc<br>
+        / &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ frontend-svc
+      </div>
     </div>
-    <div style="background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:1.5rem;">
-      <div style="font-family:var(--font-mono); font-size:0.72rem; color:var(--orange); text-transform:uppercase; letter-spacing:0.1em; margin-bottom:0.75rem;">PQC on every command</div>
-      <p style="font-size:0.9rem; color:var(--muted); line-height:1.7;">Every <code style="color:var(--cyan)">skr8tr up</code> command is signed with ML-DSA-65 before the conductor touches it. The nodes verify signatures on the mesh. There are no passwords, no TLS certs to rotate.</p>
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:1.4rem;">
+      <div style="font-family:var(--font-mono);font-size:0.72rem;color:var(--gold);margin-bottom:0.7rem;">// ENTERPRISE FEATURES ACTIVE</div>
+      <div style="font-size:0.84rem;color:var(--muted);line-height:2;">
+        HTTP/2 + TLS (Let's Encrypt)<br>
+        ALPN negotiation per client<br>
+        RBAC namespace isolation<br>
+        SSO identity bridge<br>
+        Cryptographic audit chain<br>
+        Multi-tenant conductor<br>
+        CPU/RAM autoscaler<br>
+        PQC ML-DSA-65 on all commands
+      </div>
     </div>
+  </div>
+
+  <div style="text-align:center;">
+    <a class="btn btn-primary" href="https://demo.skr8tr.online" target="_blank" style="font-size:1.05rem;padding:0.9rem 2.4rem;">Open demo.skr8tr.online ↗</a>
+    <p style="margin-top:1rem;font-family:var(--font-mono);font-size:0.78rem;color:var(--muted);">HTTPS · HTTP/2 · Let's Encrypt · Running on GCP us-central1</p>
   </div>
 </section>
 
@@ -1098,12 +1116,12 @@ skr8tr audit-verify      <span class="comment"># walk full chain — returns OK 
 <!-- ENTERPRISE -->
 <hr class="divider" />
 <div id="enterprise" class="enterprise-section">
-  <div class="section-label">// ENTERPRISE</div>
-  <h2>The layer enterprises require<br>before they write a check.</h2>
+  <div class="section-label">// ENTERPRISE PLATFORM</div>
+  <h2>The complete platform.<br>Not a toolchain. Not a kit.</h2>
   <p class="section-sub">
-    The open-source core handles orchestration, scheduling, PQC auth, and service discovery for any team.
-    Enterprise modules add the compliance, access control, and identity layers that regulated industries,
-    multi-team orgs, and Fortune 500 procurement require.
+    Skr8tr ships as one complete proprietary platform — orchestration, ingress, service discovery,
+    PQC auth, RBAC, audit chain, SSO, multi-tenancy, and autoscaling all in one licensed stack.
+    Nothing to assemble. Nothing to bolt on. One vendor. One support line.
   </p>
 
   <!-- ── ENTERPRISE FEATURE CARDS ── -->
@@ -1111,37 +1129,37 @@ skr8tr audit-verify      <span class="comment"># walk full chain — returns OK 
     <div class="ef-card">
       <h4>&#x1F511; RBAC &amp; Namespaces</h4>
       <p>Per-team ML-DSA-65 signing keys registered in a sovereign key registry. Teams are scoped to namespaces with fine-grained command ACLs: read / submit / evict / rollout / admin. One cluster, complete team isolation.</p>
-      <p style="margin-top:0.6rem;font-size:0.78rem;color:var(--gold);font-family:var(--font-mono);">ENTERPRISE ONLY</p>
+      <p style="margin-top:0.6rem;font-size:0.78rem;color:var(--green);font-family:var(--font-mono);">&#x2713; INCLUDED IN PLATFORM</p>
     </div>
     <div class="ef-card">
       <h4>&#x1F4CB; Cryptographic Audit Ledger</h4>
       <p>SHA-256 mini-blockchain chains every SUBMIT, EVICT, ROLLOUT, EXEC, and AUTH_FAIL. AES-256-GCM at-rest encryption. <code>skr8tr audit-verify</code> walks the full chain in seconds. Tamper-evident by design — any modification breaks the chain.</p>
-      <p style="margin-top:0.6rem;font-size:0.78rem;color:var(--gold);font-family:var(--font-mono);">HIPAA &bull; HITRUST &bull; PCI DSS &bull; NIST 800-53 &bull; SOC 2 &nbsp;|&nbsp; ENTERPRISE ONLY</p>
+      <p style="margin-top:0.6rem;font-size:0.78rem;color:var(--green);font-family:var(--font-mono);">&#x2713; INCLUDED &nbsp;&bull;&nbsp; HIPAA &bull; HITRUST &bull; PCI DSS &bull; NIST 800-53 &bull; SOC 2</p>
     </div>
     <div class="ef-card">
       <h4>&#x1F4E1; RFC 5424 Syslog / SIEM Export</h4>
       <p>Every audit event forwarded in real time to your SIEM over TLS — Splunk, QRadar, Microsoft Sentinel, Datadog, Graylog, or any RFC 5424-compliant receiver. Covers HIPAA § 164.312(b) centralised log collection and PCI DSS 10.5.3.</p>
-      <p style="margin-top:0.6rem;font-size:0.78rem;color:var(--gold);font-family:var(--font-mono);">ENTERPRISE ONLY</p>
+      <p style="margin-top:0.6rem;font-size:0.78rem;color:var(--green);font-family:var(--font-mono);">&#x2713; INCLUDED IN PLATFORM</p>
     </div>
     <div class="ef-card">
       <h4>&#x1F510; SSO / OIDC Identity Bridge</h4>
       <p>Federate operator identity with Okta, Google Workspace, or any OIDC-compliant provider. OAuth2 flow → IdP validates identity → bridge issues a short-lived ML-DSA-65 session credential. Group claims map directly to Skr8tr RBAC namespaces.</p>
-      <p style="margin-top:0.6rem;font-size:0.78rem;color:var(--gold);font-family:var(--font-mono);">ENTERPRISE ONLY</p>
+      <p style="margin-top:0.6rem;font-size:0.78rem;color:var(--green);font-family:var(--font-mono);">&#x2713; INCLUDED IN PLATFORM</p>
     </div>
     <div class="ef-card">
       <h4>&#x1F3DB;&#xFE0F; Multi-Tenant Conductor</h4>
       <p>Namespace isolation so team A cannot see or touch team B's workloads. Per-namespace resource quotas: max replicas, max RAM, max nodes, max submit rate. Real-time enforcement — over-quota SUBMIT is rejected before it touches a node.</p>
-      <p style="margin-top:0.6rem;font-size:0.78rem;color:var(--gold);font-family:var(--font-mono);">ENTERPRISE ONLY</p>
+      <p style="margin-top:0.6rem;font-size:0.78rem;color:var(--green);font-family:var(--font-mono);">&#x2713; INCLUDED IN PLATFORM</p>
     </div>
     <div class="ef-card">
       <h4>&#x1F4C8; Auto-Scaling</h4>
       <p>CPU, memory, queue depth, and arbitrary Prometheus metric triggers. Cron-based predictive scaling for known traffic patterns. AND/OR composite rules. Min/max replica bounds enforced at the Conductor. No metrics-server, no HPA objects.</p>
-      <p style="margin-top:0.6rem;font-size:0.78rem;color:var(--gold);font-family:var(--font-mono);">ENTERPRISE ONLY</p>
+      <p style="margin-top:0.6rem;font-size:0.78rem;color:var(--green);font-family:var(--font-mono);">&#x2713; INCLUDED IN PLATFORM</p>
     </div>
     <div class="ef-card">
       <h4>&#x26A1; HTTP/2 Ingress</h4>
       <p>Full HTTP/2 with ALPN negotiation on the ingress — multiplexed streams, header compression, gRPC proxying. Compiled into <code>skr8tr_ingress</code> with TLS termination. The OSS ingress is HTTP/1.1; HTTP/2 is enterprise.</p>
-      <p style="margin-top:0.6rem;font-size:0.78rem;color:var(--gold);font-family:var(--font-mono);">ENTERPRISE ONLY</p>
+      <p style="margin-top:0.6rem;font-size:0.78rem;color:var(--green);font-family:var(--font-mono);">&#x2713; INCLUDED IN PLATFORM</p>
     </div>
   </div>
 
@@ -1303,16 +1321,15 @@ skr8tr audit-verify      <span class="comment"># walk full chain — returns OK 
 
 <!-- CTA -->
 <div class="cta-section">
-  <div class="section-label">// GET INVOLVED</div>
-  <h2>Open source.<br>Apache 2.0.</h2>
+  <div class="section-label">// GET STARTED</div>
+  <h2>Ship your microservices.<br>Not your Saturday.</h2>
   <p>
-    Skr8tr is free, open source, and built in public. Star the repo, file issues,
-    submit PRs. If you're deploying it at scale or need enterprise support,
-    <a href="mailto:scottbaker@rusticagentic.agency">reach out</a>.
+    See the Sovereign Market demo running live on Google Cloud — then reach out.
+    All serious inquiries get a response within 24 hours.
   </p>
   <div class="hero-actions">
-    <a class="btn btn-primary" href="https://github.com/NixOSDude/skr8tr">&#x2605; Star on GitHub</a>
-    <a class="btn btn-secondary" href="https://github.com/NixOSDude/skr8tr/blob/main/OPERATIONS.md">Read the Docs &rarr;</a>
+    <a class="btn btn-primary" href="https://demo.skr8tr.online" target="_blank">See It Live ↗</a>
+    <a class="btn btn-secondary" href="mailto:scottbaker@rusticagentic.agency?subject=Skr8tr%20Inquiry">Get in Touch &rarr;</a>
   </div>
 </div>
 
@@ -1320,14 +1337,13 @@ skr8tr audit-verify      <span class="comment"># walk full chain — returns OK 
 <footer>
   <p>
     <strong style="color:var(--cyan)">skr8tr</strong> &nbsp;&bull;&nbsp;
-    <a href="https://github.com/NixOSDude/skr8tr">GitHub</a> &nbsp;&bull;&nbsp;
-    <a href="https://github.com/NixOSDude/skr8tr/blob/main/OPERATIONS.md">Docs</a> &nbsp;&bull;&nbsp;
+    <a href="https://demo.skr8tr.online" target="_blank" style="color:var(--green)">Live Demo</a> &nbsp;&bull;&nbsp;
     <a href="/blog/">Blog</a> &nbsp;&bull;&nbsp;
-    <a href="#enterprise" style="color:var(--gold)">Enterprise</a> &nbsp;&bull;&nbsp;
+    <a href="#enterprise" style="color:var(--gold)">Platform</a> &nbsp;&bull;&nbsp;
     <a href="mailto:scottbaker@rusticagentic.agency">Contact</a>
   </p>
   <p style="margin-top:0.6rem; color: #404860;">
-    Apache 2.0 &nbsp;&mdash;&nbsp; Built with C23 + Rust &nbsp;&mdash;&nbsp; No Docker. No YAML. No k8s.
+    &copy; 2026 Skr8tr. Proprietary. All rights reserved. &nbsp;&mdash;&nbsp; Built with C23 + Rust &nbsp;&mdash;&nbsp; No Docker. No YAML. No k8s.
   </p>
 </footer>
 
