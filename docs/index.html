@@ -477,28 +477,12 @@
   <ul class="nav-links">
     <li><a href="#why">Why</a></li>
     <li><a href="#features">Features</a></li>
-    <li><a href="#install">Install</a></li>
-    <li><a href="#manifest">Manifests</a></li>
-    <li><a href="#arch">Architecture</a></li>
-    <li><a href="#enterprise" style="color:var(--gold)">Enterprise</a></li>
-    <li><a href="/blog/">Blog</a></li>
+    <li><a href="#enterprise" style="color:var(--gold)">Platform</a></li>
+    <li><a href="#live-demo">Live Demo</a></li>
     <li><a href="mailto:scottbaker@rusticagentic.agency?subject=Skr8tr%20Demo%20Request" style="color:var(--green)">Request Demo</a></li>
   </ul>
 </nav>
 
-<!-- BLOG STRIP — sovereign reading list -->
-<div class="blog-strip">
-  <span class="blog-strip-label">&#x25B6; FROM THE BLOG:</span>
-  <a class="bs-orange" href="/blog/why-we-killed-kubernetes.html">Why We Killed Our Kubernetes Cluster</a>
-  <span class="sep">|</span>
-  <a class="bs-cyan" href="/blog/post-quantum-auth-no-passwords.html">Post-Quantum Auth — No Passwords</a>
-  <span class="sep">|</span>
-  <a class="bs-gold" href="/blog/rolling-updates-without-readiness-probes.html">Rolling Updates Without ReadinessProbes</a>
-  <span class="sep">|</span>
-  <a class="bs-purple" href="/blog/sovereign-market-9-microservices-no-kubernetes.html">9 Microservices. 3 Nodes. Zero Kubernetes.</a>
-  <span class="sep">|</span>
-  <a class="bs-gold" href="/blog/sovereign-audit-chain-hipaa-compliant.html">HIPAA-Compliant Audit Chain in 600 Lines of C</a>
-</div>
 
 <!-- HERO -->
 <div class="hero">
@@ -523,20 +507,20 @@
       <div class="term-title">skr8tr — sovereign orchestrator</div>
     </div>
     <div class="term-body">
-      <div><span class="prompt">$</span> <span class="cmd">skr8tr --key ~/.skr8tr/signing.sec up api.skr8tr</span></div>
-      <div><span class="out">&nbsp; submitting /opt/apps/api.skr8tr... </span><span class="ok">ok</span></div>
-      <div><span class="out">&nbsp; app&nbsp;&nbsp;&nbsp; api-server</span></div>
+      <div><span class="prompt">$</span> <span class="cmd">skr8tr up api-server</span></div>
+      <div><span class="out">&nbsp; submitting api-server... </span><span class="ok">ok</span></div>
+      <div><span class="out">&nbsp; app&nbsp;&nbsp;&nbsp; api-server &nbsp; replicas 3</span></div>
       <div><span class="out">&nbsp; node&nbsp;&nbsp; b33c8ed0ea05839d78934cb8</span></div>
       <div>&nbsp;</div>
       <div><span class="prompt">$</span> <span class="cmd">skr8tr nodes</span></div>
       <div><span class="out">&nbsp; 3 live node(s)</span></div>
       <div>&nbsp;</div>
-      <div><span class="out">&nbsp; NODE ID&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;IP&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CPU%&nbsp;&nbsp; RAM</span></div>
-      <div><span class="out">&nbsp; b33c8ed0ea05839d78934cb8dbb1c5f4&nbsp;&nbsp;10.0.0.1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3%&nbsp;&nbsp; 45GB</span></div>
-      <div><span class="out">&nbsp; a1f2c3d4e5f6789012345678abcdef01&nbsp;&nbsp;10.0.0.2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;9%&nbsp;&nbsp; 31GB</span></div>
-      <div><span class="out">&nbsp; 9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b&nbsp;&nbsp;10.0.0.3&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1%&nbsp;&nbsp; 62GB</span></div>
+      <div><span class="out">&nbsp; NODE&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;IP&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;CPU%&nbsp;&nbsp; RAM</span></div>
+      <div><span class="out">&nbsp; b33c8ed0ea05...&nbsp;&nbsp;10.0.0.1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 3%&nbsp;&nbsp; 45GB</span></div>
+      <div><span class="out">&nbsp; a1f2c3d4e5f6...&nbsp;&nbsp;10.0.0.2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 9%&nbsp;&nbsp; 31GB</span></div>
+      <div><span class="out">&nbsp; 9e8d7c6b5a4f...&nbsp;&nbsp;10.0.0.3&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 1%&nbsp;&nbsp; 62GB</span></div>
       <div>&nbsp;</div>
-      <div><span class="prompt">$</span> <span class="cmd">skr8tr --key ~/.skr8tr/signing.sec rollout api-v2.skr8tr</span></div>
+      <div><span class="prompt">$</span> <span class="cmd">skr8tr rollout api-server --version v2</span></div>
       <div><span class="out">&nbsp; rolling out... </span><span class="ok">ok</span><span class="out"> — new replicas launching, old draining (8s settle)</span></div>
     </div>
   </div>
@@ -583,9 +567,9 @@
   <p class="section-sub">
     You're a web developer. You build products, ship features, and fix bugs.
     Kubernetes repays that work by demanding a platform engineer, 200-line YAML manifests,
-    Helm charts, etcd, a container runtime, and a $600MB control plane — before your first
-    workload runs. Skr8tr was purpose-built for web teams. Three binaries. Six-line manifests.
-    PQC-signed deploys. Built-in ingress. Running on GCP right now.
+    Helm charts, etcd, a container runtime, and a 600MB control plane — before your first
+    workload runs. Skr8tr was purpose-built for web teams. 5 MB control plane. Human-readable
+    manifests. PQC-signed deploys. Built-in HTTP/2 ingress. Running on GCP right now.
   </p>
   <div class="comparison">
     <div class="comp-card them">
@@ -604,13 +588,13 @@
       <h3>&#x2713; &nbsp;Skr8tr — built for web devs</h3>
       <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> 5 MB total — three C23 binaries + a Rust CLI</div>
       <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> ML-DSA-65 post-quantum signatures — key never leaves your machine</div>
-      <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> <code>.skr8tr</code> manifest — 6 lines to deploy an app</div>
-      <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> No Docker. Fork+exec. Any binary, any language.</div>
-      <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> Built-in HTTP ingress — longest-prefix routing, Tower discovery</div>
-      <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> <code>skr8tr rollout app.skr8tr</code> — one command, zero downtime</div>
+      <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> Human-readable manifest — deploy a full web service in seconds</div>
+      <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> No Docker. No container runtime. Any binary, any language.</div>
+      <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> Built-in HTTP/2 ingress with TLS — longest-prefix routing, service discovery</div>
+      <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> One PQC-signed command for rolling deploys — zero downtime</div>
       <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> Masterless mesh — no etcd, no leader, no SPOF</div>
       <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> Prometheus metrics on every node (port 9100) — no metrics-server required</div>
-      <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> cgroups v2 resource limits built in — memory.max + cpu.max per workload</div>
+      <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> cgroups v2 resource limits built in — hard memory and CPU enforcement per workload</div>
       <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> WASM + full VM (QEMU / Firecracker) alongside binary workloads on the same cluster</div>
       <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> SHA-256 audit chain + AES-256-GCM + SIEM syslog — HIPAA/HITRUST/PCI DSS built in</div>
     </div>
@@ -629,86 +613,54 @@
     of the equivalent managed Kubernetes setup — with zero control plane overhead and no DevOps tax.
   </p>
 
-  <!-- Deployment path selector -->
-  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;margin-bottom:2rem;">
-
-    <div style="background:var(--bg3);border:1px solid rgba(0,212,255,0.2);border-radius:10px;padding:1.4rem;">
-      <div style="font-family:var(--font-mono);font-size:0.72rem;color:var(--cyan);margin-bottom:0.5rem;">// BEST PRICE</div>
-      <div style="font-weight:700;color:var(--text);margin-bottom:0.4rem;">Hetzner Bare Metal</div>
-      <div style="font-size:0.84rem;color:var(--muted);line-height:1.6;margin-bottom:0.8rem;">AX41 dedicated servers — ~$40/node/mo. No hypervisor overhead. Pairs perfectly with Skr8tr's fork+exec model. Ideal for startups, SaaS, EU data residency.</div>
-      <div style="font-size:0.78rem;color:var(--green);font-family:var(--font-mono);">✓ Lowest TCO &nbsp;✓ GDPR-friendly &nbsp;✓ No egress fees</div>
-      <div style="margin-top:0.6rem;font-size:0.75rem;color:var(--red);font-family:var(--font-mono);">✗ No HIPAA BAA &nbsp;✗ No FedRAMP</div>
-    </div>
-
-    <div style="background:var(--bg3);border:1px solid rgba(240,176,32,0.2);border-radius:10px;padding:1.4rem;">
-      <div style="font-family:var(--font-mono);font-size:0.72rem;color:var(--gold);margin-bottom:0.5rem;">// MOST FLEXIBLE</div>
-      <div style="font-weight:700;color:var(--text);margin-bottom:0.4rem;">AWS / GCP / Azure (EC2 — no EKS)</div>
-      <div style="font-size:0.84rem;color:var(--muted);line-height:1.6;margin-bottom:0.8rem;">Run Skr8tr directly on cloud VMs — no managed control plane fee, no EKS overhead. Keep existing cloud commitments and vendor relationships. HIPAA BAA available.</div>
-      <div style="font-size:0.78rem;color:var(--green);font-family:var(--font-mono);">✓ HIPAA BAA available &nbsp;✓ Existing EDPs honored &nbsp;✓ Multi-region</div>
-      <div style="margin-top:0.6rem;font-size:0.75rem;color:var(--red);font-family:var(--font-mono);">✗ Higher compute cost than bare metal</div>
-    </div>
-
-    <div style="background:var(--bg3);border:1px solid rgba(48,216,144,0.2);border-radius:10px;padding:1.4rem;">
-      <div style="font-family:var(--font-mono);font-size:0.72rem;color:var(--green);margin-bottom:0.5rem;">// BEST TCO — REGULATED / GOV</div>
-      <div style="font-weight:700;color:var(--text);margin-bottom:0.4rem;">On-Prem / Colo / Air-Gap</div>
-      <div style="font-size:0.84rem;color:var(--muted);line-height:1.6;margin-bottom:0.8rem;">Own hardware in your data center or a colo. Zero cloud dependency, zero egress, zero control plane fee. Required for FedRAMP High, DoD IL4/IL5, air-gapped environments.</div>
-      <div style="font-size:0.78rem;color:var(--green);font-family:var(--font-mono);">✓ FedRAMP / DoD capable &nbsp;✓ Air-gap capable &nbsp;✓ Zero cloud bill</div>
-      <div style="margin-top:0.6rem;font-size:0.75rem;color:var(--muted);font-family:var(--font-mono);">~ Higher upfront CapEx</div>
-    </div>
-
-  </div>
-
-  <!-- Cost comparison table — Hetzner path vs EKS -->
-  <div style="font-family:var(--font-mono);font-size:0.72rem;color:var(--muted);margin-bottom:0.6rem;letter-spacing:0.08em;">// SCENARIO: 10-NODE PRODUCTION CLUSTER — HETZNER BARE METAL vs AWS EKS</div>
+  <!-- GCP vs GKE comparison -->
+  <div style="font-family:var(--font-mono);font-size:0.72rem;color:var(--muted);margin-bottom:0.6rem;letter-spacing:0.08em;">// SCENARIO: 10-NODE PRODUCTION CLUSTER — GCP + SKR8TR vs GOOGLE KUBERNETES ENGINE</div>
   <div style="overflow-x:auto;margin-bottom:2.5rem;">
     <table style="width:100%;border-collapse:collapse;font-size:0.88rem;">
       <thead>
         <tr style="border-bottom:1px solid var(--border);">
           <th style="text-align:left;padding:0.8rem 1rem;color:var(--muted);font-weight:600;"></th>
-          <th style="text-align:right;padding:0.8rem 1rem;color:var(--red);font-weight:700;">Kubernetes (EKS)</th>
-          <th style="text-align:right;padding:0.8rem 1rem;color:var(--cyan);font-weight:700;">Skr8tr (Hetzner)</th>
-          <th style="text-align:right;padding:0.8rem 1rem;color:var(--gold);font-weight:700;">Skr8tr (AWS EC2)</th>
+          <th style="text-align:right;padding:0.8rem 1rem;color:var(--red);font-weight:700;">GKE (Kubernetes)</th>
+          <th style="text-align:right;padding:0.8rem 1rem;color:var(--cyan);font-weight:700;">Skr8tr on GCP</th>
           <th style="text-align:right;padding:0.8rem 1rem;color:var(--green);font-weight:700;">You Save*</th>
         </tr>
       </thead>
       <tbody>
         <tr style="border-bottom:1px solid rgba(26,32,48,0.6);">
           <td style="padding:0.75rem 1rem;color:var(--muted);">10-node compute</td>
-          <td style="padding:0.75rem 1rem;text-align:right;color:var(--text);">$2,800 / mo<br><small style="color:var(--muted);">m5.large × 10 + EKS + NAT + ALB</small></td>
-          <td style="padding:0.75rem 1rem;text-align:right;color:var(--text);">$400 / mo<br><small style="color:var(--muted);">AX41 × 10 bare metal</small></td>
-          <td style="padding:0.75rem 1rem;text-align:right;color:var(--text);">$1,900 / mo<br><small style="color:var(--muted);">m5.large × 10, no EKS fee</small></td>
-          <td style="padding:0.75rem 1rem;text-align:right;color:var(--green);font-weight:700;">$900–$2,400</td>
+          <td style="padding:0.75rem 1rem;text-align:right;color:var(--text);">$2,200 / mo<br><small style="color:var(--muted);">n2-standard-2 × 10 + GKE fee + Cloud LB</small></td>
+          <td style="padding:0.75rem 1rem;text-align:right;color:var(--text);">$1,200 / mo<br><small style="color:var(--muted);">n2-standard-2 × 10 — no GKE fee, no LB</small></td>
+          <td style="padding:0.75rem 1rem;text-align:right;color:var(--green);font-weight:700;">$1,000</td>
         </tr>
         <tr style="border-bottom:1px solid rgba(26,32,48,0.6);">
           <td style="padding:0.75rem 1rem;color:var(--muted);">Observability</td>
-          <td style="padding:0.75rem 1rem;text-align:right;color:var(--text);">$300 / mo<br><small style="color:var(--muted);">Datadog $23/host + APM</small></td>
-          <td colspan="2" style="padding:0.75rem 1rem;text-align:right;color:var(--text);">$0<br><small style="color:var(--muted);">Prometheus /metrics built in</small></td>
+          <td style="padding:0.75rem 1rem;text-align:right;color:var(--text);">$300 / mo<br><small style="color:var(--muted);">Datadog / Cloud Monitoring add-on</small></td>
+          <td style="padding:0.75rem 1rem;text-align:right;color:var(--text);">$0<br><small style="color:var(--muted);">Prometheus /metrics built in every node</small></td>
           <td style="padding:0.75rem 1rem;text-align:right;color:var(--green);font-weight:700;">$300</td>
         </tr>
         <tr style="border-bottom:1px solid rgba(26,32,48,0.6);">
-          <td style="padding:0.75rem 1rem;color:var(--muted);">Ingress controller</td>
-          <td style="padding:0.75rem 1rem;text-align:right;color:var(--text);">$80 / mo<br><small style="color:var(--muted);">nginx Helm chart + ALB</small></td>
-          <td colspan="2" style="padding:0.75rem 1rem;text-align:right;color:var(--text);">$0<br><small style="color:var(--muted);">Built-in HTTP/TLS ingress</small></td>
+          <td style="padding:0.75rem 1rem;color:var(--muted);">Ingress / load balancer</td>
+          <td style="padding:0.75rem 1rem;text-align:right;color:var(--text);">$80 / mo<br><small style="color:var(--muted);">NGINX Ingress + Cloud LB</small></td>
+          <td style="padding:0.75rem 1rem;text-align:right;color:var(--text);">$0<br><small style="color:var(--muted);">HTTP/2 + TLS ingress built in</small></td>
           <td style="padding:0.75rem 1rem;text-align:right;color:var(--green);font-weight:700;">$80</td>
         </tr>
         <tr style="border-bottom:1px solid rgba(26,32,48,0.6);">
-          <td style="padding:0.75rem 1rem;color:var(--muted);">Audit / compliance (Falco, OPA)</td>
-          <td style="padding:0.75rem 1rem;text-align:right;color:var(--text);">$500+ / mo<br><small style="color:var(--muted);">3rd-party SIEM connector + tooling</small></td>
-          <td colspan="2" style="padding:0.75rem 1rem;text-align:right;color:var(--text);">Included<br><small style="color:var(--muted);">Enterprise license — audit + syslog</small></td>
+          <td style="padding:0.75rem 1rem;color:var(--muted);">Audit / compliance tooling</td>
+          <td style="padding:0.75rem 1rem;text-align:right;color:var(--text);">$500+ / mo<br><small style="color:var(--muted);">Falco, OPA, 3rd-party SIEM connector</small></td>
+          <td style="padding:0.75rem 1rem;text-align:right;color:var(--text);">Included<br><small style="color:var(--muted);">Audit chain + SIEM syslog in platform</small></td>
           <td style="padding:0.75rem 1rem;text-align:right;color:var(--green);font-weight:700;">$500+</td>
         </tr>
         <tr style="border-bottom:1px solid rgba(26,32,48,0.6);">
           <td style="padding:0.75rem 1rem;color:var(--muted);">Platform engineer overhead</td>
           <td style="padding:0.75rem 1rem;text-align:right;color:var(--text);">$8,000 / mo<br><small style="color:var(--muted);">½ FTE @ $190k/yr — upgrades, CRD hell</small></td>
-          <td colspan="2" style="padding:0.75rem 1rem;text-align:right;color:var(--text);">~$1,000 / mo<br><small style="color:var(--muted);">3 binaries, part-time ops</small></td>
-          <td style="padding:0.75rem 1rem;text-align:right;color:var(--green);font-weight:700;">$7,000</td>
+          <td style="padding:0.75rem 1rem;text-align:right;color:var(--text);">Minimal<br><small style="color:var(--muted);">3 binaries — managed and supported by Skr8tr</small></td>
+          <td style="padding:0.75rem 1rem;text-align:right;color:var(--green);font-weight:700;">$7,000+</td>
         </tr>
         <tr style="background:rgba(48,216,144,0.05);border-top:2px solid rgba(48,216,144,0.25);">
           <td style="padding:1rem;color:var(--text);font-weight:700;">Total / mo</td>
-          <td style="padding:1rem;text-align:right;color:var(--red);font-weight:700;font-size:1.05rem;">~$11,680</td>
-          <td style="padding:1rem;text-align:right;color:var(--cyan);font-weight:700;font-size:1.05rem;">~$1,400<br><small style="color:var(--muted);font-weight:400;font-size:0.75rem;">Hetzner bare metal</small></td>
-          <td style="padding:1rem;text-align:right;color:var(--gold);font-weight:700;font-size:1.05rem;">~$2,900<br><small style="color:var(--muted);font-weight:400;font-size:0.75rem;">AWS EC2 — no EKS fee</small></td>
-          <td style="padding:1rem;text-align:right;color:var(--green);font-weight:700;font-size:1.1rem;">$8,780–$10,280<br><small style="color:var(--green);font-weight:400;font-size:0.78rem;">$105k–$123k / year</small></td>
+          <td style="padding:1rem;text-align:right;color:var(--red);font-weight:700;font-size:1.05rem;">~$11,080</td>
+          <td style="padding:1rem;text-align:right;color:var(--cyan);font-weight:700;font-size:1.05rem;">Significantly less<br><small style="color:var(--muted);font-weight:400;font-size:0.75rem;">scoped per project — request a consultation</small></td>
+          <td style="padding:1rem;text-align:right;color:var(--green);font-weight:700;font-size:1.1rem;">$8,880+<br><small style="color:var(--green);font-weight:400;font-size:0.78rem;">$106k+ / year</small></td>
         </tr>
       </tbody>
     </table>
@@ -717,27 +669,25 @@
   <!-- ROI callout cards -->
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1.2rem;margin-bottom:2rem;">
     <div style="background:var(--bg3);border:1px solid rgba(48,216,144,0.2);border-radius:10px;padding:1.4rem;text-align:center;">
-      <div style="font-size:2rem;font-weight:800;color:var(--green);font-family:var(--font-mono);">$123k</div>
-      <div style="color:var(--muted);font-size:0.84rem;margin-top:0.3rem;">max annual savings<br>Hetzner vs EKS (10 nodes)</div>
+      <div style="font-size:2rem;font-weight:800;color:var(--green);font-family:var(--font-mono);">$106k+</div>
+      <div style="color:var(--muted);font-size:0.84rem;margin-top:0.3rem;">estimated annual savings<br>GCP + Skr8tr vs GKE (10 nodes)</div>
     </div>
     <div style="background:var(--bg3);border:1px solid rgba(0,212,255,0.2);border-radius:10px;padding:1.4rem;text-align:center;">
-      <div style="font-size:2rem;font-weight:800;color:var(--cyan);font-family:var(--font-mono);">$105k</div>
-      <div style="color:var(--muted);font-size:0.84rem;margin-top:0.3rem;">savings keeping AWS<br>(no EKS, no Datadog)</div>
-    </div>
-    <div style="background:var(--bg3);border:1px solid rgba(240,176,32,0.2);border-radius:10px;padding:1.4rem;text-align:center;">
-      <div style="font-size:2rem;font-weight:800;color:var(--gold);font-family:var(--font-mono);">0</div>
+      <div style="font-size:2rem;font-weight:800;color:var(--cyan);font-family:var(--font-mono);">0</div>
       <div style="color:var(--muted);font-size:0.84rem;margin-top:0.3rem;">YAML files, CRDs, or<br>Helm charts required</div>
     </div>
+    <div style="background:var(--bg3);border:1px solid rgba(240,176,32,0.2);border-radius:10px;padding:1.4rem;text-align:center;">
+      <div style="font-size:2rem;font-weight:800;color:var(--gold);font-family:var(--font-mono);">&lt; 2s</div>
+      <div style="color:var(--muted);font-size:0.84rem;margin-top:0.3rem;">deploy time — fork + exec,<br>no image pull, no pod scheduler</div>
+    </div>
     <div style="background:var(--bg3);border:1px solid rgba(240,120,64,0.2);border-radius:10px;padding:1.4rem;text-align:center;">
-      <div style="font-size:2rem;font-weight:800;color:var(--orange);font-family:var(--font-mono);">&lt; 1 day</div>
-      <div style="color:var(--muted);font-size:0.84rem;margin-top:0.3rem;">typical migration time<br>from k8s (with our help)</div>
+      <div style="font-size:2rem;font-weight:800;color:var(--orange);font-family:var(--font-mono);">GCP</div>
+      <div style="color:var(--muted);font-size:0.84rem;margin-top:0.3rem;">only — your billing account,<br>your infrastructure, your data</div>
     </div>
   </div>
 
   <p style="text-align:center;color:var(--muted);font-size:0.82rem;margin-bottom:0.5rem;">
-    * Savings vs EKS. Hetzner path requires no HIPAA BAA — use AWS/Azure for HIPAA-regulated workloads.
-    Cost estimates based on AWS us-east-1 on-demand, Hetzner AX41, and industry SRE fully-loaded cost (April 2026).
-    Actual savings vary by team size and stack complexity.
+    * GKE estimates based on GCP us-central1 on-demand pricing, April 2026. Every project is scoped individually — <a href="mailto:scottbaker@rusticagentic.agency?subject=Skr8tr%20Consultation">request a consultation</a> for your stack.
   </p>
 </section>
 
@@ -757,7 +707,7 @@
     <div class="feat-card">
       <div class="feat-icon">&#x1F504;</div>
       <h3>Rolling Updates</h3>
-      <p><code>skr8tr rollout app.skr8tr</code> — launch new replicas, wait for settle, drain old ones. One command. No readiness probe YAML required.</p>
+      <p>Launch new replicas, wait for settle, drain old ones. One command. No readiness probe YAML, no PodDisruptionBudget objects, no deployment strategy config required.</p>
     </div>
     <div class="feat-card">
       <div class="feat-icon">&#x1F310;</div>
@@ -767,12 +717,12 @@
     <div class="feat-card">
       <div class="feat-icon">&#x1F9F5;</div>
       <h3>Masterless Mesh</h3>
-      <p>No etcd, no Raft, no leader election. Every node is a sovereign peer. The Conductor schedules via UDP heartbeats. Add nodes by running the binary.</p>
+      <p>No etcd, no Raft, no leader election. Every node is a sovereign peer. The Conductor coordinates lightweight heartbeats across the fleet. Add nodes by running the daemon — zero reconfiguration.</p>
     </div>
     <div class="feat-card">
       <div class="feat-icon">&#x1F50D;</div>
       <h3>Service Discovery</h3>
-      <p>Built-in Tower registry. Services register automatically on launch, deregister on kill. Round-robin across replicas. Query with <code>skr8tr lookup</code>.</p>
+      <p>Services register automatically on launch, deregister on kill. Round-robin across replicas. The ingress resolves live service addresses on every request — no stale routing tables, no manual config updates.</p>
     </div>
     <div class="feat-card">
       <div class="feat-icon">&#x2764;&#xFE0F;</div>
@@ -782,186 +732,108 @@
     <div class="feat-card">
       <div class="feat-icon">&#x1F4DC;</div>
       <h3>Log Streaming</h3>
-      <p>Per-process ring buffer (last 200 lines). Query with <code>skr8tr logs app</code>. Auto-resolved to the correct node — no SSH required.</p>
+      <p>Per-process log buffer for every running service. Query from anywhere — the platform routes the request to the correct node automatically. No SSH. No kubectl exec. No log aggregation setup required.</p>
     </div>
     <div class="feat-card">
       <div class="feat-icon">&#x26A1;</div>
       <h3>Bare Metal Speed</h3>
-      <p>No container runtime. No OCI image pull. Fork + exec. Your binary starts in milliseconds, not seconds. Zero copy overhead on the data path.</p>
+      <p>No container runtime. No image registry. No pull latency. Your binary starts in milliseconds — from deploy command to serving traffic in under two seconds. Zero abstraction overhead on the critical path.</p>
     </div>
     <div class="feat-card">
       <div class="feat-icon">&#x1F512;</div>
       <h3>TLS/HTTPS Ingress</h3>
-      <p>The built-in ingress terminates TLS natively — pass <code>--tls-cert</code> and <code>--tls-key</code> to flip from HTTP to HTTPS. Backend connections stay plain. No Certbot config, no nginx TLS blocks.</p>
+      <p>The built-in ingress terminates TLS natively. Backend connections stay plain — no re-encryption, no nginx TLS blocks, no ALB in front. HTTPS just works.</p>
     </div>
     <div class="feat-card">
       <div class="feat-icon">&#x1F4CA;</div>
       <h3>Prometheus Metrics</h3>
-      <p>Every node exposes <code>/metrics</code> on port 9100 in Prometheus text format — process count, CPU%, free RAM, health failure counts. Scrape with any standard Prometheus stack. Zero config.</p>
+      <p>Every node exposes a Prometheus metrics endpoint — process count, CPU%, free RAM, health failure counts. Scrape with any standard Prometheus stack. Zero config, no metrics-server required.</p>
     </div>
     <div class="feat-card">
       <div class="feat-icon">&#x1F9EE;</div>
       <h3>cgroups v2 Resource Limits</h3>
-      <p>Declare <code>ram</code> and <code>cpu</code> in your manifest. The node writes <code>memory.max</code> and <code>cpu.max</code> into the workload's cgroup at launch. Hard enforcement, no escape hatch.</p>
+      <p>Declare memory and CPU limits per workload. Hard enforcement via cgroups v2 — every process stays within its allocated slice. No escape hatch, no resource contention between services.</p>
     </div>
     <div class="feat-card">
       <div class="feat-icon">&#x26D3;&#xFE0F;</div>
       <h3>Secret Injection</h3>
-      <p>Declare secrets in a <code>secret {}</code> block. They are injected directly into the child process env after fork — never included in UDP wire commands, never written to logs, never visible to other processes.</p>
+      <p>Secrets are injected directly into the process at launch — never written to logs, never sent over the wire, never visible to other processes on the same host. Declare once, secure forever.</p>
     </div>
     <div class="feat-card">
       <div class="feat-icon">&#x1F4BE;</div>
       <h3>Persistent Volumes</h3>
-      <p>Mount host paths as workload env vars via <code>volume {}</code>. The directory is auto-created if missing. The process sees <code>DATA_DIR=/data/myapp</code>. No PersistentVolumeClaim, no StorageClass.</p>
+      <p>Mount host paths as environment variables for any workload. The directory is auto-created if missing. No PersistentVolumeClaim, no StorageClass, no provisioner setup.</p>
     </div>
     <div class="feat-card">
       <div class="feat-icon">&#x267B;&#xFE0F;</div>
       <h3>Restart Policy</h3>
-      <p><code>restart always</code> — node relaunches locally on any exit. <code>restart on-failure</code> — only on non-zero. <code>restart never</code> — Conductor rebalances cross-node. All three send DIED/RELAUNCHED to keep placement accurate.</p>
+      <p>Three policies: always restart on any exit, restart only on failure, or never restart and rebalance cross-node. Placement state is always accurate — the platform tracks every relaunch.</p>
     </div>
     <div class="feat-card">
       <div class="feat-icon">&#x23F3;</div>
       <h3>Graceful Drain</h3>
-      <p>Set <code>drain 30s</code> in your manifest. On KILL, the node sends SIGTERM and waits the configured window before SIGKILL — giving your process time to flush queues, close DB connections, finish in-flight requests.</p>
+      <p>Configure a drain window per service. On shutdown, the platform signals gracefully and waits the configured window before force-killing — giving processes time to flush queues, close DB connections, and finish in-flight requests.</p>
     </div>
     <div class="feat-card">
       <div class="feat-icon">&#x1F5A5;&#xFE0F;</div>
       <h3>WASM + Full VM Workloads</h3>
-      <p>Declare <code>type wasm</code> to run a WASM module via wasmtime. Declare <code>type vm</code> with a <code>vm {}</code> block to launch a QEMU or Firecracker microVM. Binary, WASM, and VM workloads coexist on the same node fleet.</p>
+      <p>Run native binaries, WASM modules, or full QEMU/Firecracker microVMs — all on the same node fleet. Mix workload types freely. One platform, one control plane, one ingress.</p>
     </div>
     <div class="feat-card">
       <div class="feat-icon">&#x1F4E1;</div>
       <h3>Remote Exec &amp; Dead Replica Detection</h3>
-      <p><code>skr8tr exec myapp "ls -la /data"</code> — the Conductor routes the shell command to the node hosting the app and returns stdout. Dead replicas are detected via instant SIGCHLD → DIED broadcast — no 15-second expiry wait.</p>
+      <p>Run a shell command against any running workload — the platform routes it to the correct node and returns stdout. Dead replicas are detected and replaced instantly, not after a polling cycle.</p>
     </div>
     <div class="feat-card">
       <div class="feat-icon">&#x1F4BE;</div>
       <h3>Persistent Conductor State</h3>
-      <p>The Conductor writes its workload table to disk on every SUBMIT/EVICT. If the Conductor restarts, it replays the state file and re-establishes desired placement — zero operator intervention.</p>
+      <p>The Conductor persists workload state continuously. If it restarts, it replays state and re-establishes desired placement automatically — zero operator intervention, no lost assignments.</p>
     </div>
     <div class="feat-card" style="border-color:rgba(48,216,144,0.3);background:rgba(48,216,144,0.03);">
       <div class="feat-icon">&#x1F9E0;</div>
       <h3 style="color:var(--green)">Autonomous Self-Healing Mesh</h3>
-      <p>Dead replicas are detected instantly via <code>SIGCHLD → DIED</code> broadcast — no polling delay. Failed health probes kill and relaunch in-place. CPU autoscale triggers scale-up/down without operator input. Restart policies enforce recovery across node reboots. The cluster heals itself — continuously, without a human in the loop.</p>
+      <p>Dead replicas are detected and replaced instantly — no polling delay. Failed health probes kill and relaunch in-place. Autoscale triggers fire on CPU, memory, or custom Prometheus metrics without operator input. Restart policies enforce recovery across node reboots. The cluster heals itself — continuously, without a human in the loop.</p>
     </div>
   </div>
 
-  <!-- Enterprise callout -->
-  <div style="margin-top:2.5rem;background:rgba(240,176,32,0.05);border:1px solid rgba(240,176,32,0.25);border-radius:12px;padding:1.8rem 2rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1.2rem;">
-    <div>
-      <div style="font-family:var(--font-mono);font-size:0.75rem;color:var(--gold);letter-spacing:0.1em;margin-bottom:0.5rem;">// ENTERPRISE PLATFORM</div>
-      <p style="color:var(--text);font-weight:600;font-size:1rem;margin-bottom:0.3rem;">RBAC, Audit Ledger, SSO, Multi-Tenancy &amp; Autoscaling — all included.</p>
-      <p style="color:var(--muted);font-size:0.88rem;">Not bolt-ons. Not a separate SKU. The enterprise layer ships as part of the complete Skr8tr platform — deployed, licensed, and supported as one stack.</p>
-    </div>
-    <a class="btn-enterprise solid" href="#enterprise" style="white-space:nowrap;">See the Full Platform &rarr;</a>
-  </div>
 </section>
 
-<hr class="divider" />
-
-<!-- MANIFEST -->
-<section id="manifest">
-  <div class="section-label">// MANIFEST FORMAT</div>
-  <h2>Six lines to deploy. Not sixty.</h2>
-  <p class="section-sub">The <code>.skr8tr</code> manifest is Skr8tr's sovereign alternative to Kubernetes YAML. Human-readable. No anchors. No CRDs.</p>
-
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
-    <div>
-      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:0.6rem;font-family:var(--font-mono)">full web service — secrets, scaling, health</p>
-      <div class="code-block">
-<span class="kw">app</span> <span class="val">api-server</span>
-  <span class="kw">exec</span>     <span class="str">/usr/local/bin/myapi</span>
-  <span class="kw">port</span>     <span class="val">8080</span>  &nbsp; <span class="kw">replicas</span> <span class="val">3</span>
-  <span class="kw">secret</span> { <span class="val">DB_PASSWORD</span> <span class="str">••••••</span> }
-  <span class="kw">scale</span>  { <span class="kw">min</span> <span class="val">1</span>  <span class="kw">max</span> <span class="val">8</span>  <span class="kw">cpu-above</span> <span class="val">80</span> }
-  <span class="kw">health</span> { <span class="kw">check</span> <span class="str">GET /healthz 200</span>  <span class="kw">interval</span> <span class="val">10s</span> }</div>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:0.8rem;justify-content:center;">
-      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:1.2rem 1.4rem;">
-        <p style="font-size:0.84rem;color:var(--muted);line-height:1.7;">Secrets are injected into the child process after fork — never written to logs, never sent over the wire, never visible to other processes.</p>
-      </div>
-      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:1.2rem 1.4rem;">
-        <p style="font-size:0.84rem;color:var(--muted);line-height:1.7;">The autoscaler reads live CPU and RAM from cgroups v2 — no metrics-server, no HPA objects, no Prometheus scrape required for scaling.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<hr class="divider" />
-
-<!-- ARCHITECTURE -->
-<section id="arch">
-  <div class="section-label">// ARCHITECTURE</div>
-  <h2>Three binaries. Infinite nodes.</h2>
-  <p class="section-sub">Skr8tr's control plane is three C23 daemons and a Rust CLI. No etcd. No apiserver. No controller-manager. No scheduler pod. No kubelet.</p>
-
-  <div class="arch-diagram">
-<span class="hi">                              Internet / Cloud LB</span>
-<span class="hi">                                       │ HTTPS</span>
-<span class="hi">                            ┌──────────▼──────────┐</span>
-<span class="hi">                            │   skr8tr_ingress     │</span>  HTTP reverse proxy
-<span class="hi">                            │   (TCP :80)          │</span>  longest-prefix routing
-<span class="hi">                            └──────────┬──────────┘</span>
-                                       │ Tower LOOKUP
-<span class="grn">┌──────────────┐</span>  UDP :7771   <span class="grn">┌────────▼────────┐</span>
-<span class="grn">│  skr8tr CLI  │</span> ───────────▶ <span class="grn">│  skr8tr_sched   │</span>  The Conductor
-<span class="grn">│  (Rust)      │</span> ◀─────────── <span class="grn">│  ML-DSA-65 auth │</span>  Masterless scheduler
-<span class="grn">└──────────────┘</span>              <span class="grn">└────────┬────────┘</span>
-                                       │ LAUNCH via UDP :7775
-                              <span class="org">┌────────▼────────┐</span>
-                              <span class="org">│  skr8tr_node    │</span>  Fleet node (N nodes)
-                              <span class="org">│  fork + exec    │</span>  Runs your workloads · metrics :9100
-                              <span class="org">└────────┬────────┘</span>
-                                       │ REGISTER via UDP :7772
-                              <span class="hi">┌────────▼────────┐</span>
-                              <span class="hi">│  skr8tr_reg     │</span>  The Tower · REGISTER/LOOKUP
-                              <span class="hi">│  (UDP :7772)    │</span>  Service discovery
-                              <span class="hi">└─────────────────┘</span>
-  </div>
-  <p style="margin-top:1.4rem;font-size:0.84rem;color:var(--muted);">
-    The <strong style="color:var(--gold)">Audit Ledger</strong> runs inside the Conductor — every SUBMIT, EVICT, ROLLOUT, EXEC, and AUTH_FAIL is SHA-256 chained and optionally AES-256-GCM encrypted at rest. RFC 5424 syslog forwarding ships events to any SIEM. HIPAA · HITRUST · PCI DSS · NIST 800-53 · SOC 2.
-  </p>
-</section>
 
 <hr class="divider" />
 
 <!-- HOW IT WORKS -->
 <section id="install">
   <div class="section-label">// HOW IT WORKS</div>
-  <h2>Write a manifest.<br>Deploy in seconds.</h2>
-  <p class="section-sub">Skr8tr ships as pre-built binaries for your target platform. You get the Conductor, two worker node daemons, the CLI, and the ingress — everything configured, licensed, and ready. Here is what day one looks like.</p>
+  <h2>You focus on your product.<br>We handle the platform.</h2>
+  <p class="section-sub">Skr8tr is fully managed — you get a running GCP cluster, deployed and configured by the people who built the platform. No compiler setup. No ops overhead. No Kubernetes certification required.</p>
 
   <div class="install-steps">
     <div class="install-step">
       <div class="step-num">1</div>
       <div class="step-body">
-        <h4>You receive pre-built, signed binaries for your platform</h4>
-        <p>No compiler setup. No Nix. No build toolchain. Skr8tr ships as a set of pre-built, patchelf-clean binaries for Linux x86-64 or ARM64. Drop them on any host, set executable, done. PQC signing keys are generated on your machine — they never leave it.</p>
+        <h4>You provision a GCP billing account</h4>
+        <p>Your infrastructure, your data. You own the GCP project and billing account — sole-tenant by design. We receive access to configure and deploy your cluster. Zero lock-in. You can audit, inspect, and hand off at any time.</p>
       </div>
     </div>
     <div class="install-step">
       <div class="step-num">2</div>
       <div class="step-body">
-        <h4>Write a six-line manifest for each service</h4>
-        <div class="code-block" style="font-size:0.82rem;">
-<span class="kw">app</span> <span class="val">api-server</span>
-  <span class="kw">exec</span> <span class="str">/opt/myapp/bin/api</span> &nbsp; <span class="kw">port</span> <span class="val">8080</span> &nbsp; <span class="kw">replicas</span> <span class="val">3</span>
-  <span class="kw">restart</span> <span class="val">on-failure</span> &nbsp; <span class="kw">ram</span> <span class="val">512MB</span> &nbsp; <span class="kw">cpu</span> <span class="val">2</span></div>
-        <p style="margin-top:0.6rem;font-size:0.84rem;color:var(--muted);">No YAML. No CRDs. No Helm. Secrets, volumes, health checks, and autoscale rules live in the same file.</p>
+        <h4>We design and deploy your cluster</h4>
+        <p>We spec the right VM topology for your workload, provision the Skr8tr control plane, configure TLS ingress, PQC signing keys, RBAC namespaces, and SSO integration. Everything wired and verified before you receive the keys.</p>
       </div>
     </div>
     <div class="install-step">
       <div class="step-num">3</div>
       <div class="step-body">
         <h4>One PQC-signed command deploys across your entire fleet</h4>
-        <p style="font-size:0.88rem;color:var(--muted);">Every deploy is ML-DSA-65 signed before the Conductor touches it. No bearer tokens. No passwords. Your signing key never leaves your machine. Skr8tr schedules your service across available nodes, registers it in Tower, and the ingress starts routing — in under two seconds.</p>
+        <p style="font-size:0.88rem;color:var(--muted);">Every deploy is ML-DSA-65 signed before the platform touches it. No bearer tokens. No passwords. Your signing key never leaves your machine. Skr8tr schedules your service across available nodes, registers it in the service registry, and the ingress starts routing — in under two seconds.</p>
       </div>
     </div>
     <div class="install-step">
       <div class="step-num">4</div>
       <div class="step-body">
-        <h4>The ingress routes traffic instantly — zero config</h4>
-        <p style="font-size:0.88rem;color:var(--muted);">Services self-register in Tower the moment they start. The built-in HTTP/2 ingress resolves them on every request via live Tower lookups. No nginx reload. No Ingress YAML. No ALB. Change a route by redeploying — nothing else required.</p>
+        <h4>Traffic routes instantly — compliance runs continuously</h4>
+        <p style="font-size:0.88rem;color:var(--muted);">Services self-register the moment they start. The built-in HTTP/2 ingress resolves them on every request. The audit ledger chains every event. SIEM forwarding ships events in real time. The platform heals itself — continuously, without a human in the loop.</p>
       </div>
     </div>
   </div>
@@ -990,11 +862,11 @@
   <!-- Stack report -->
   <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:2rem;font-family:var(--font-mono);font-size:0.84rem;line-height:2;margin-bottom:2.5rem;overflow-x:auto;">
     <div style="color:var(--muted);font-size:0.72rem;letter-spacing:0.1em;margin-bottom:1rem;">// LIVE GCP CLUSTER — demo.skr8tr.online</div>
-    <div><span style="color:var(--cyan)">Conductor</span>  &nbsp;e2-small &nbsp;&nbsp; 10.10.0.10 &nbsp; <span style="color:var(--green)">34.171.44.13</span> &nbsp;&nbsp; skr8tr_sched · skr8tr_reg · skr8tr_rbac · skr8tr_sso · skr8tr_ingress</div>
-    <div><span style="color:var(--orange)">Node-1</span>  &nbsp;&nbsp;&nbsp;&nbsp;n2-std-2 &nbsp;&nbsp; 10.10.0.11 &nbsp; <span style="color:var(--green)">35.192.183.185</span> &nbsp; skr8tr_node · frontend-svc · cart-svc</div>
-    <div><span style="color:var(--orange)">Node-2</span>  &nbsp;&nbsp;&nbsp;&nbsp;n2-std-2 &nbsp;&nbsp; 10.10.0.12 &nbsp; <span style="color:var(--green)">136.119.17.103</span> &nbsp; skr8tr_node · 9 microservices</div>
+    <div><span style="color:var(--cyan)">Conductor</span>  &nbsp;e2-small &nbsp;&nbsp; GCP us-central1 &nbsp; <span style="color:var(--green)">34.171.44.13</span> &nbsp;&nbsp; Conductor · Registry · RBAC · SSO · Ingress</div>
+    <div><span style="color:var(--orange)">Node-1</span>  &nbsp;&nbsp;&nbsp;&nbsp;n2-std-2 &nbsp;&nbsp; GCP us-central1 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Worker node · frontend · cart</div>
+    <div><span style="color:var(--orange)">Node-2</span>  &nbsp;&nbsp;&nbsp;&nbsp;n2-std-2 &nbsp;&nbsp; GCP us-central1 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Worker node · 9 microservices</div>
     <div style="margin-top:1rem;border-top:1px solid var(--border);padding-top:1rem;">
-      <span style="color:var(--gold)">Enterprise stack active:</span> &nbsp;HTTP/2 ingress (ALPN) · RBAC · SSO · Audit chain · Multi-tenant conductor · Autoscaler
+      <span style="color:var(--gold)">Platform features active:</span> &nbsp;HTTP/2 ingress (ALPN) · RBAC · SSO · Audit chain · Multi-tenant conductor · Autoscaler
     </div>
   </div>
 
@@ -1028,7 +900,7 @@
       </div>
     </div>
     <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:1.4rem;">
-      <div style="font-family:var(--font-mono);font-size:0.72rem;color:var(--gold);margin-bottom:0.7rem;">// ENTERPRISE FEATURES ACTIVE</div>
+      <div style="font-family:var(--font-mono);font-size:0.72rem;color:var(--gold);margin-bottom:0.7rem;">// PLATFORM FEATURES ACTIVE</div>
       <div style="font-size:0.84rem;color:var(--muted);line-height:2;">
         HTTP/2 + TLS (Let's Encrypt)<br>
         ALPN negotiation per client<br>
@@ -1065,7 +937,7 @@
 <!-- ENTERPRISE -->
 <hr class="divider" />
 <div id="enterprise" class="enterprise-section">
-  <div class="section-label">// ENTERPRISE PLATFORM</div>
+  <div class="section-label">// THE PLATFORM</div>
   <h2>The complete platform.<br>Not a toolchain. Not a kit.</h2>
   <p class="section-sub">
     Skr8tr ships as one complete proprietary platform — orchestration, ingress, service discovery,
@@ -1077,12 +949,12 @@
   <div class="enterprise-features-grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.2rem;margin-bottom:3rem;">
     <div class="ef-card">
       <h4>&#x1F511; RBAC &amp; Namespaces</h4>
-      <p>Per-team ML-DSA-65 signing keys registered in a sovereign key registry. Teams are scoped to namespaces with fine-grained command ACLs: read / submit / evict / rollout / admin. One cluster, complete team isolation.</p>
+      <p>Post-quantum signing keys per team. Teams are scoped to namespaces with fine-grained command ACLs: read / deploy / rollout / admin. One cluster, complete team isolation. No shared credentials, no lateral movement.</p>
       <p style="margin-top:0.6rem;font-size:0.78rem;color:var(--green);font-family:var(--font-mono);">&#x2713; INCLUDED IN PLATFORM</p>
     </div>
     <div class="ef-card">
       <h4>&#x1F4CB; Cryptographic Audit Ledger</h4>
-      <p>SHA-256 mini-blockchain chains every SUBMIT, EVICT, ROLLOUT, EXEC, and AUTH_FAIL. AES-256-GCM at-rest encryption. <code>skr8tr audit-verify</code> walks the full chain in seconds. Tamper-evident by design — any modification breaks the chain.</p>
+      <p>SHA-256 chained ledger records every deploy, rollout, exec, and auth event. AES-256-GCM at-rest encryption. Tamper-evident by design — any modification breaks the chain. Full chain verification in seconds.</p>
       <p style="margin-top:0.6rem;font-size:0.78rem;color:var(--green);font-family:var(--font-mono);">&#x2713; INCLUDED &nbsp;&bull;&nbsp; HIPAA &bull; HITRUST &bull; PCI DSS &bull; NIST 800-53 &bull; SOC 2</p>
     </div>
     <div class="ef-card">
@@ -1092,7 +964,7 @@
     </div>
     <div class="ef-card">
       <h4>&#x1F510; SSO / OIDC Identity Bridge</h4>
-      <p>Federate operator identity with Okta, Google Workspace, or any OIDC-compliant provider. OAuth2 flow → IdP validates identity → bridge issues a short-lived ML-DSA-65 session credential. Group claims map directly to Skr8tr RBAC namespaces.</p>
+      <p>Federate operator identity with Okta, Google Workspace, or any OIDC-compliant provider. Your IdP validates identity — Skr8tr maps group claims directly to RBAC namespaces. No separate user database. No password management.</p>
       <p style="margin-top:0.6rem;font-size:0.78rem;color:var(--green);font-family:var(--font-mono);">&#x2713; INCLUDED IN PLATFORM</p>
     </div>
     <div class="ef-card">
@@ -1107,164 +979,32 @@
     </div>
     <div class="ef-card">
       <h4>&#x26A1; HTTP/2 Ingress</h4>
-      <p>Full HTTP/2 with ALPN negotiation on the ingress — multiplexed streams, header compression, gRPC proxying. Compiled into <code>skr8tr_ingress</code> with TLS termination. The OSS ingress is HTTP/1.1; HTTP/2 is enterprise.</p>
+      <p>Full HTTP/2 with ALPN negotiation — multiplexed streams, header compression, gRPC proxying. Native TLS termination with automatic Let's Encrypt certificate management. Backends stay plain — no re-encryption overhead.</p>
       <p style="margin-top:0.6rem;font-size:0.78rem;color:var(--green);font-family:var(--font-mono);">&#x2713; INCLUDED IN PLATFORM</p>
     </div>
   </div>
 
-  <!-- ── SUBSCRIPTION TIERS ── -->
-  <div class="section-label" style="margin-bottom:1rem;">// ENTERPRISE SUBSCRIPTIONS — MONTHLY</div>
-  <p style="color:var(--muted);font-size:0.9rem;text-align:center;margin-bottom:2rem;">
-    Compiled enterprise binaries + updates + support. No source access required. Cancel any time.
-  </p>
-
-  <div class="pricing-grid" style="margin-bottom:3rem;">
-
-    <div class="pricing-card">
-      <div class="pricing-badge">// TEAM</div>
-      <h3>Team License</h3>
-      <div class="pricing-price">$3,500 <span>/ month</span></div>
-      <p>For engineering teams operating a single Skr8tr cluster that need compliance and access control without the full enterprise stack.</p>
+  <!-- ── CONSULTATION CTA ── -->
+  <div style="margin-top:2rem;max-width:680px;margin-left:auto;margin-right:auto;text-align:center;">
+    <div class="pricing-card featured" style="text-align:left;">
+      <div class="pricing-badge">// REQUEST A CONSULTATION</div>
+      <h3 style="font-size:1.25rem;">Every project is scoped individually.</h3>
+      <p style="font-size:0.95rem;line-height:1.7;">
+        No published price list. No tiers. Every Skr8tr deployment is designed around your workloads, your GCP account, your compliance requirements.
+        You describe your stack — I design the cluster, deploy it, and hand you the keys.
+      </p>
       <ul class="pricing-features">
-        <li>Up to 10 nodes</li>
-        <li>RBAC &amp; Namespaces (up to 5 teams)</li>
-        <li>Cryptographic Audit Ledger + AES-256-GCM</li>
-        <li>RFC 5424 Syslog / SIEM forwarding</li>
-        <li>Email support — 1 business day SLA</li>
-        <li>Monthly binary updates</li>
+        <li>GCP cluster design + full deployment</li>
+        <li>Kubernetes migration — workloads, ingress, CI/CD</li>
+        <li>PQC key provisioning + team onboarding</li>
+        <li>RBAC, SSO, SIEM forwarding — all wired and verified</li>
+        <li>Ongoing support — you get the engineer who built it</li>
       </ul>
-      <a class="btn-enterprise" href="mailto:scottbaker@rusticagentic.agency?subject=Skr8tr%20Team%20License">Start Team License &rarr;</a>
-    </div>
-
-    <div class="pricing-card featured">
-      <div class="pricing-badge">// BUSINESS — MOST POPULAR</div>
-      <h3>Business License</h3>
-      <div class="pricing-price">$7,500 <span>/ month</span></div>
-      <p>For multi-team organizations that need full identity federation, namespace isolation, and compliance reporting across departments.</p>
-      <ul class="pricing-features">
-        <li>Up to 50 nodes</li>
-        <li>Everything in Team, plus:</li>
-        <li>SSO / OIDC bridge (Okta, Azure AD, Google)</li>
-        <li>Multi-Tenant Conductor — unlimited namespaces</li>
-        <li>Custom Metric Autoscale (memory, queue, Prometheus)</li>
-        <li>Slack channel — 4-hour response SLA</li>
-        <li>Quarterly architecture review call</li>
-      </ul>
-      <a class="btn-enterprise solid" href="mailto:scottbaker@rusticagentic.agency?subject=Skr8tr%20Business%20License">Start Business License &rarr;</a>
-    </div>
-
-    <div class="pricing-card">
-      <div class="pricing-badge">// STRATEGIC</div>
-      <h3>Strategic License</h3>
-      <div class="pricing-price">$15,000 <span>/ month</span></div>
-      <p>For enterprises, regulated industries, and government deployments requiring unlimited scale and a direct line to the author. 100% remote — no onsite required. Skr8tr is designed to run without incidents; when questions arise, you get the engineer who built it.</p>
-      <ul class="pricing-features">
-        <li>Unlimited nodes</li>
-        <li>All enterprise modules</li>
-        <li>Air-gap / on-prem deployment support (remote)</li>
-        <li>FedRAMP / FISMA advisory</li>
-        <li>Priority support — 4-hour response, business hours</li>
-        <li>AI/ML agent first-responder for cluster anomalies</li>
-        <li>Monthly architecture review + roadmap input</li>
-        <li>Custom feature development included (4 days/month)</li>
-      </ul>
-      <a class="btn-enterprise" href="mailto:scottbaker@rusticagentic.agency?subject=Skr8tr%20Strategic%20License">Contact for Strategic &rarr;</a>
-    </div>
-
-  </div>
-
-  <!-- ── PROFESSIONAL SERVICES ── -->
-  <div class="section-label" style="margin-bottom:1rem;">// PROFESSIONAL SERVICES — ONE-TIME</div>
-
-  <div class="pricing-grid" style="margin-bottom:2.5rem;">
-
-    <div class="pricing-card">
-      <div class="pricing-badge">// CONSULTING</div>
-      <h3>Cluster Setup &amp; Migration</h3>
-      <div class="pricing-price">$2,500 <span>/ day</span></div>
-      <p>We design and deploy your Skr8tr cluster — bare metal, cloud, or hybrid. Full k8s migration: workload audit, manifest conversion, ingress routing, CI/CD rework, PQC key provisioning.</p>
-      <ul class="pricing-features">
-        <li>Bare metal, cloud, or hybrid clusters</li>
-        <li>Full k8s migration (workloads, ingress, CI/CD)</li>
-        <li>PQC key provisioning + operator training</li>
-        <li>30-day post-deployment support included</li>
-      </ul>
-      <a class="btn-enterprise" href="mailto:scottbaker@rusticagentic.agency?subject=Skr8tr%20Cluster%20Setup">Get a Quote &rarr;</a>
-    </div>
-
-    <div class="pricing-card featured">
-      <div class="pricing-badge">// ARCHITECTURE REVIEW</div>
-      <h3>Infrastructure Audit</h3>
-      <div class="pricing-price">$3,500 <span>flat</span></div>
-      <p>A focused deep dive into your current orchestration stack. We identify bottlenecks, security gaps, and cost waste. Written report with prioritized recommendations delivered within 48 hours.</p>
-      <ul class="pricing-features">
-        <li>Current stack analysis (k8s, ECS, Nomad, etc.)</li>
-        <li>Bottleneck + security gap identification</li>
-        <li>Written report with prioritized recommendations</li>
-        <li>1 follow-up strategy call included</li>
-      </ul>
-      <a class="btn-enterprise solid" href="mailto:scottbaker@rusticagentic.agency?subject=Skr8tr%20Architecture%20Review">Book a Review &rarr;</a>
-    </div>
-
-    <div class="pricing-card">
-      <div class="pricing-badge">// CUSTOM DEVELOPMENT</div>
-      <h3>Custom Integration &amp; Feature Work</h3>
-      <div class="pricing-price">$2,500 <span>/ day</span></div>
-      <p>Bespoke enterprise features built to your requirements — SIEM adapters, compliance report generators, GPU workload scheduling, custom autoscale triggers, FedRAMP control mapping.</p>
-      <ul class="pricing-features">
-        <li>Scope agreed in writing before a line is written</li>
-        <li>Delivered as private enterprise binary or source</li>
-        <li>Full documentation + integration tests included</li>
-        <li>Source handed over — zero vendor lock-in</li>
-      </ul>
-      <a class="btn-enterprise" href="mailto:scottbaker@rusticagentic.agency?subject=Skr8tr%20Custom%20Dev">Discuss Requirements &rarr;</a>
-    </div>
-
-  </div>
-
-  <!-- What to provide -->
-  <div style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:2rem 2.2rem;margin-bottom:2rem;">
-    <div class="section-label" style="margin-bottom:0.6rem;">// WHAT TO PROVIDE</div>
-    <p style="color:var(--muted);font-size:0.9rem;margin-bottom:1.2rem;">
-      We do the work. You provide the context. Here is exactly what we need to get started — nothing more:
-    </p>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem;">
-      <div>
-        <p style="font-size:0.84rem;color:var(--text);font-weight:600;margin-bottom:0.4rem;">For cluster setup / migration</p>
-        <ul style="list-style:none;font-size:0.84rem;color:var(--muted);line-height:2;">
-          <li>→ SSH or VPN access to your target hosts</li>
-          <li>→ <code>kubectl get nodes -o wide</code> (if migrating from k8s)</li>
-          <li>→ <code>kubectl get deployments -A -o yaml</code></li>
-          <li>→ Ingress rules / current routing table</li>
-          <li>→ Any secret injection requirements</li>
-        </ul>
-      </div>
-      <div>
-        <p style="font-size:0.84rem;color:var(--text);font-weight:600;margin-bottom:0.4rem;">For architecture review</p>
-        <ul style="list-style:none;font-size:0.84rem;color:var(--muted);line-height:2;">
-          <li>→ <code>docker ps</code> / <code>kubectl get all -A</code> output</li>
-          <li>→ Current infra diagram or a written description</li>
-          <li>→ List of pain points (latency, cost, ops burden)</li>
-          <li>→ Read-only codebase access (GitHub/GitLab link) if available</li>
-        </ul>
-      </div>
-      <div>
-        <p style="font-size:0.84rem;color:var(--text);font-weight:600;margin-bottom:0.4rem;">For custom feature development</p>
-        <ul style="list-style:none;font-size:0.84rem;color:var(--muted);line-height:2;">
-          <li>→ A written spec or user story (1 page is enough)</li>
-          <li>→ Target environment (bare metal, cloud, hybrid)</li>
-          <li>→ Compliance constraints (HIPAA, PCI, FedRAMP…)</li>
-          <li>→ Read access to your Skr8tr fork if you have one</li>
-        </ul>
+      <div style="text-align:center;padding-top:0.5rem;">
+        <a class="btn-enterprise solid" href="mailto:scottbaker@rusticagentic.agency?subject=Skr8tr%20Consultation">Request a Consultation &rarr;</a>
+        <p style="margin-top:1rem;font-size:0.84rem;color:var(--muted);">All serious inquiries answered within 24 hours.</p>
       </div>
     </div>
-  </div>
-
-  <div style="text-align:center; padding: 1rem 0 0.5rem;">
-    <p style="color:var(--muted); font-size:0.92rem; margin-bottom:1.4rem;">
-      All serious inquiries get a response within 24 hours.
-    </p>
-    <a class="btn btn-primary" href="mailto:scottbaker@rusticagentic.agency?subject=Skr8tr%20Enterprise%20Inquiry">Contact Us &rarr;</a>
   </div>
 </div>
 
@@ -1286,8 +1026,8 @@
 <footer>
   <p>
     <strong style="color:var(--cyan)">skr8tr</strong> &nbsp;&bull;&nbsp;
-    <a href="https://demo.skr8tr.online" target="_blank" style="color:var(--green)">Live Demo</a> &nbsp;&bull;&nbsp;
-    <a href="/blog/">Blog</a> &nbsp;&bull;&nbsp;
+    <a href="#live-demo" style="color:var(--green)">Live Demo</a> &nbsp;&bull;&nbsp;
+    <a href="#features">Features</a> &nbsp;&bull;&nbsp;
     <a href="#enterprise" style="color:var(--gold)">Platform</a> &nbsp;&bull;&nbsp;
     <a href="mailto:scottbaker@rusticagentic.agency">Contact</a>
   </p>
