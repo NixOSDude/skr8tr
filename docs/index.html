@@ -482,7 +482,7 @@
     <li><a href="#arch">Architecture</a></li>
     <li><a href="#enterprise" style="color:var(--gold)">Enterprise</a></li>
     <li><a href="/blog/">Blog</a></li>
-    <li><a href="https://demo.skr8tr.online" target="_blank" style="color:var(--green)">Live Demo ↗</a></li>
+    <li><a href="mailto:scottbaker@rusticagentic.agency?subject=Skr8tr%20Demo%20Request" style="color:var(--green)">Request Demo</a></li>
   </ul>
 </nav>
 
@@ -510,8 +510,8 @@
     <span style="font-size:0.9em;opacity:0.75;">5 MB control plane &bull; PQC-signed commands &bull; No Docker &bull; No YAML &bull; No k8s</span>
   </p>
   <div class="hero-actions">
-    <a class="btn btn-primary" href="https://demo.skr8tr.online" target="_blank">See It Live ↗</a>
-    <a class="btn btn-secondary" href="mailto:scottbaker@rusticagentic.agency?subject=Skr8tr%20Inquiry">Request Access &rarr;</a>
+    <a class="btn btn-primary" href="mailto:scottbaker@rusticagentic.agency?subject=Skr8tr%20Demo%20Request">Request Demo &rarr;</a>
+    <a class="btn btn-secondary" href="mailto:scottbaker@rusticagentic.agency?subject=Skr8tr%20Inquiry">Get in Touch &rarr;</a>
   </div>
 
   <!-- Terminal demo -->
@@ -579,15 +579,17 @@
 <!-- WHY -->
 <section id="why">
   <div class="section-label">// WHY SKR8TR</div>
-  <h2>Kubernetes is an infrastructure problem.<br>Web teams have a shipping problem.</h2>
+  <h2>Kubernetes was built for Google.<br>You are not Google.</h2>
   <p class="section-sub">
-    You know how to build services. You shouldn't need to become a platform engineer to run them.
-    k8s was built for Google's scale in 2014. Skr8tr was built for web teams who have outgrown
-    a single server but aren't Google. Three binaries. Any Linux host. Up in five minutes.
+    You're a web developer. You build products, ship features, and fix bugs.
+    Kubernetes repays that work by demanding a platform engineer, 200-line YAML manifests,
+    Helm charts, etcd, a container runtime, and a $600MB control plane — before your first
+    workload runs. Skr8tr was purpose-built for web teams. Three binaries. Six-line manifests.
+    PQC-signed deploys. Built-in ingress. Running on GCP right now.
   </p>
   <div class="comparison">
     <div class="comp-card them">
-      <h3>&#x2717; &nbsp;Kubernetes</h3>
+      <h3>&#x2717; &nbsp;Kubernetes — the tax</h3>
       <div class="comp-row"><span class="comp-icon" style="color:var(--red)">&#x2717;</span> 600+ MB control plane (etcd + apiserver + scheduler + controller-manager + ...)</div>
       <div class="comp-row"><span class="comp-icon" style="color:var(--red)">&#x2717;</span> kubeconfig bearer tokens — base64-encoded secrets, effectively plaintext</div>
       <div class="comp-row"><span class="comp-icon" style="color:var(--red)">&#x2717;</span> YAML + CRDs + Helm charts + kustomize layers</div>
@@ -599,7 +601,7 @@
       <div class="comp-row"><span class="comp-icon" style="color:var(--red)">&#x2717;</span> Bearer tokens are base64 secrets — kubeconfig breaches grant full cluster access</div>
     </div>
     <div class="comp-card us">
-      <h3>&#x2713; &nbsp;Skr8tr</h3>
+      <h3>&#x2713; &nbsp;Skr8tr — built for web devs</h3>
       <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> 5 MB total — three C23 binaries + a Rust CLI</div>
       <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> ML-DSA-65 post-quantum signatures — key never leaves your machine</div>
       <div class="comp-row"><span class="comp-icon" style="color:var(--green)">&#x2713;</span> <code>.skr8tr</code> manifest — 6 lines to deploy an app</div>
@@ -620,11 +622,11 @@
 <!-- COST SAVINGS -->
 <section id="savings">
   <div class="section-label">// THE REAL COST OF KUBERNETES</div>
-  <h2>k8s is expensive.<br>We've done the math.</h2>
+  <h2>Kubernetes charges you<br>before you ship a single line.</h2>
   <p class="section-sub">
-    Infrastructure bills are visible. Engineer time spent maintaining k8s is not.
-    Add them together and the picture is stark. Skr8tr runs on <em>any</em> Linux host —
-    pick the deployment model that fits your compliance requirements.
+    The GKE bill is visible. The platform engineer you had to hire to keep it running is not.
+    Add them together and the picture is stark. A 10-node Skr8tr cluster on GCP costs a fraction
+    of the equivalent managed Kubernetes setup — with zero control plane overhead and no DevOps tax.
   </p>
 
   <!-- Deployment path selector -->
@@ -863,75 +865,24 @@
   <h2>Six lines to deploy. Not sixty.</h2>
   <p class="section-sub">The <code>.skr8tr</code> manifest is Skr8tr's sovereign alternative to Kubernetes YAML. Human-readable. No anchors. No CRDs.</p>
 
-  <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1.5rem;">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
     <div>
-      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:0.6rem;font-family:var(--font-mono)">api-server.skr8tr — basic service</p>
+      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:0.6rem;font-family:var(--font-mono)">full web service — secrets, scaling, health</p>
       <div class="code-block">
 <span class="kw">app</span> <span class="val">api-server</span>
   <span class="kw">exec</span>     <span class="str">/usr/local/bin/myapi</span>
-  <span class="kw">args</span>     <span class="str">--port 8080 --db postgres.internal</span>
-  <span class="kw">port</span>     <span class="val">8080</span>
-  <span class="kw">replicas</span> <span class="val">3</span>
-  <span class="kw">restart</span>  <span class="val">on-failure</span>
-  <span class="kw">drain</span>    <span class="val">30s</span>
-  <span class="kw">ram</span>      <span class="val">536870912</span>  <span class="comment"># 512 MB cgroups limit</span>
-  <span class="kw">cpu</span>      <span class="val">2</span>
-  <span class="kw">health</span> {
-    <span class="kw">check</span>    <span class="str">GET /healthz 200</span>
-    <span class="kw">interval</span> <span class="val">10s</span>
-    <span class="kw">retries</span>  <span class="val">3</span>
-  }</div>
+  <span class="kw">port</span>     <span class="val">8080</span>  &nbsp; <span class="kw">replicas</span> <span class="val">3</span>
+  <span class="kw">secret</span> { <span class="val">DB_PASSWORD</span> <span class="str">••••••</span> }
+  <span class="kw">scale</span>  { <span class="kw">min</span> <span class="val">1</span>  <span class="kw">max</span> <span class="val">8</span>  <span class="kw">cpu-above</span> <span class="val">80</span> }
+  <span class="kw">health</span> { <span class="kw">check</span> <span class="str">GET /healthz 200</span>  <span class="kw">interval</span> <span class="val">10s</span> }</div>
     </div>
-    <div>
-      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:0.6rem;font-family:var(--font-mono)">with secrets, volumes, and scaling</p>
-      <div class="code-block">
-<span class="kw">app</span> <span class="val">api-server</span>
-  <span class="kw">exec</span>     <span class="str">/usr/local/bin/myapi</span>
-  <span class="kw">port</span>     <span class="val">8080</span>
-  <span class="kw">replicas</span> <span class="val">2</span>
-  <span class="kw">secret</span> {
-    <span class="val">DB_PASSWORD</span>  <span class="str">hunter2</span>
-    <span class="val">API_KEY</span>      <span class="str">sk-abc123</span>
-  }
-  <span class="kw">volume</span> {
-    <span class="val">DATA_DIR</span>  <span class="str">/data/myapp</span>
-  }
-  <span class="kw">scale</span> {
-    <span class="kw">min</span>        <span class="val">1</span>
-    <span class="kw">max</span>        <span class="val">8</span>
-    <span class="kw">cpu-above</span>  <span class="val">80</span>
-    <span class="kw">cpu-below</span>  <span class="val">20</span>
-  }</div>
-    </div>
-  </div>
-  <div style="margin-top:1.5rem;display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
-    <div>
-      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:0.6rem;font-family:var(--font-mono)">wasm workload</p>
-      <div class="code-block">
-<span class="kw">app</span> <span class="val">data-processor</span>
-  <span class="kw">type</span>     <span class="val">wasm</span>
-  <span class="kw">exec</span>     <span class="str">/opt/modules/processor.wasm</span>
-  <span class="kw">replicas</span> <span class="val">2</span>
-  <span class="kw">restart</span>  <span class="val">always</span>
-  <span class="kw">volume</span> {
-    <span class="val">INPUT_DIR</span>   <span class="str">/data/input</span>
-    <span class="val">OUTPUT_DIR</span>  <span class="str">/data/output</span>
-  }</div>
-    </div>
-    <div>
-      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:0.6rem;font-family:var(--font-mono)">firecracker microVM</p>
-      <div class="code-block">
-<span class="kw">app</span> <span class="val">isolated-worker</span>
-  <span class="kw">type</span>     <span class="val">vm</span>
-  <span class="kw">restart</span>  <span class="val">on-failure</span>
-  <span class="kw">vm</span> {
-    <span class="kw">hypervisor</span>  <span class="str">firecracker</span>
-    <span class="kw">kernel</span>      <span class="str">/opt/vmlinux</span>
-    <span class="kw">rootfs</span>      <span class="str">/opt/worker.ext4</span>
-    <span class="kw">vcpus</span>       <span class="val">2</span>
-    <span class="kw">memory</span>      <span class="val">512</span>
-    <span class="kw">net</span>         <span class="str">user</span>
-  }</div>
+    <div style="display:flex;flex-direction:column;gap:0.8rem;justify-content:center;">
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:1.2rem 1.4rem;">
+        <p style="font-size:0.84rem;color:var(--muted);line-height:1.7;">Secrets are injected into the child process after fork — never written to logs, never sent over the wire, never visible to other processes.</p>
+      </div>
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:1.2rem 1.4rem;">
+        <p style="font-size:0.84rem;color:var(--muted);line-height:1.7;">The autoscaler reads live CPU and RAM from cgroups v2 — no metrics-server, no HPA objects, no Prometheus scrape required for scaling.</p>
+      </div>
     </div>
   </div>
 </section>
@@ -992,39 +943,25 @@
       <div class="step-num">2</div>
       <div class="step-body">
         <h4>Write a six-line manifest for each service</h4>
-        <div class="code-block">
+        <div class="code-block" style="font-size:0.82rem;">
 <span class="kw">app</span> <span class="val">api-server</span>
-  <span class="kw">exec</span>     <span class="str">/opt/myapp/bin/api</span>
-  <span class="kw">args</span>     <span class="str">--port 8080</span>
-  <span class="kw">port</span>     <span class="val">8080</span>
-  <span class="kw">replicas</span> <span class="val">3</span>
-  <span class="kw">restart</span>  <span class="val">on-failure</span></div>
-        <p style="margin-top:0.6rem;font-size:0.84rem;color:var(--muted);">No YAML. No CRDs. No Helm. The <code>.skr8tr</code> manifest is human-readable and expressive — secrets, volumes, health checks, and autoscale rules in the same file.</p>
+  <span class="kw">exec</span> <span class="str">/opt/myapp/bin/api</span> &nbsp; <span class="kw">port</span> <span class="val">8080</span> &nbsp; <span class="kw">replicas</span> <span class="val">3</span>
+  <span class="kw">restart</span> <span class="val">on-failure</span> &nbsp; <span class="kw">ram</span> <span class="val">512MB</span> &nbsp; <span class="kw">cpu</span> <span class="val">2</span></div>
+        <p style="margin-top:0.6rem;font-size:0.84rem;color:var(--muted);">No YAML. No CRDs. No Helm. Secrets, volumes, health checks, and autoscale rules live in the same file.</p>
       </div>
     </div>
     <div class="install-step">
       <div class="step-num">3</div>
       <div class="step-body">
-        <h4>One command deploys across your entire fleet</h4>
-        <div class="code-block">
-<span class="prompt">$</span> <span class="cmd">skr8tr --key ~/.skr8tr/signing.sec up api-server.skr8tr</span>
-<span class="out">&nbsp; submitting api-server... </span><span class="ok">ok</span>
-<span class="out">&nbsp; scheduled → node-1 (10.10.0.11) — 3 replicas launching</span>
-<span class="out">&nbsp; registered in Tower — ingress routing active</span></div>
-        <p style="margin-top:0.6rem;font-size:0.84rem;color:var(--muted);">Every deploy command is ML-DSA-65 signed before it touches the Conductor. No bearer tokens. No passwords. Your signing key stays on your machine.</p>
+        <h4>One PQC-signed command deploys across your entire fleet</h4>
+        <p style="font-size:0.88rem;color:var(--muted);">Every deploy is ML-DSA-65 signed before the Conductor touches it. No bearer tokens. No passwords. Your signing key never leaves your machine. Skr8tr schedules your service across available nodes, registers it in Tower, and the ingress starts routing — in under two seconds.</p>
       </div>
     </div>
     <div class="install-step">
       <div class="step-num">4</div>
       <div class="step-body">
-        <h4>The ingress routes traffic instantly — no config required</h4>
-        <div class="code-block">
-<span class="comment"># Services register themselves in Tower on launch.</span>
-<span class="comment"># The ingress resolves them on every request — no nginx config, no reload.</span>
-<span class="prompt">$</span> <span class="cmd">skr8tr tower</span>
-<span class="out">&nbsp; api-server      10.10.0.11:8080   ttl=28s   replicas=3</span>
-<span class="out">&nbsp; frontend        10.10.0.12:4200   ttl=25s   replicas=1</span>
-<span class="out">&nbsp; product-svc     10.10.0.12:8001   ttl=27s   replicas=1</span></div>
+        <h4>The ingress routes traffic instantly — zero config</h4>
+        <p style="font-size:0.88rem;color:var(--muted);">Services self-register in Tower the moment they start. The built-in HTTP/2 ingress resolves them on every request via live Tower lookups. No nginx reload. No Ingress YAML. No ALB. Change a route by redeploying — nothing else required.</p>
       </div>
     </div>
   </div>
@@ -1034,7 +971,7 @@
     <div style="font-family:var(--font-mono);font-size:0.75rem;color:var(--cyan);letter-spacing:0.1em;margin-bottom:0.8rem;">// SEE IT LIVE — RIGHT NOW</div>
     <h3 style="font-size:1.4rem;font-weight:700;margin-bottom:0.7rem;">9 Rust microservices. Angular SPA. 3 GCP VMs.<br>Running on Skr8tr. No Kubernetes.</h3>
     <p style="color:var(--muted);font-size:0.92rem;max-width:540px;margin:0 auto 1.8rem;">The Sovereign Market demo is a full e-commerce platform — products, cart, orders, search, reviews, recommendations — all orchestrated by Skr8tr on Google Cloud. Live. Right now.</p>
-    <a class="btn btn-primary" href="https://demo.skr8tr.online" target="_blank" style="font-size:1rem;padding:0.9rem 2.2rem;">Open demo.skr8tr.online ↗</a>
+    <a class="btn btn-primary" href="mailto:scottbaker@rusticagentic.agency?subject=Skr8tr%20Demo%20Request" style="font-size:1rem;padding:0.9rem 2.2rem;">Request a Live Demo &rarr;</a>
   </div>
 </section>
 
@@ -1105,9 +1042,21 @@
     </div>
   </div>
 
+  <!-- Screenshot preview -->
+  <div style="margin-bottom:2.5rem;text-align:center;">
+    <div style="display:inline-block;border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,0.5);max-width:860px;width:100%;">
+      <img src="/img/sovereign-market-demo.png"
+           alt="Sovereign Market — 9 microservices, Angular SPA, orchestrated by Skr8tr on GCP"
+           style="display:block;width:100%;height:auto;" />
+    </div>
+    <p style="margin-top:1rem;font-family:var(--font-mono);font-size:0.78rem;color:var(--muted);">
+      Sovereign Market &bull; Angular SPA &bull; 9 Rust microservices &bull; HTTP/2 + Let's Encrypt &bull; GCP us-central1 &bull; Zero Kubernetes
+    </p>
+  </div>
+
   <div style="text-align:center;">
-    <a class="btn btn-primary" href="https://demo.skr8tr.online" target="_blank" style="font-size:1.05rem;padding:0.9rem 2.4rem;">Open demo.skr8tr.online ↗</a>
-    <p style="margin-top:1rem;font-family:var(--font-mono);font-size:0.78rem;color:var(--muted);">HTTPS · HTTP/2 · Let's Encrypt · Running on GCP us-central1</p>
+    <a class="btn btn-primary" href="mailto:scottbaker@rusticagentic.agency?subject=Skr8tr%20Demo%20Request" style="font-size:1.05rem;padding:0.9rem 2.4rem;">Request a Live Demo &rarr;</a>
+    <p style="margin-top:1rem;font-size:0.84rem;color:var(--muted);">Send a request and I'll spin up the live environment for you personally.</p>
   </div>
 </section>
 
@@ -1324,11 +1273,11 @@
   <div class="section-label">// GET STARTED</div>
   <h2>Ship your microservices.<br>Not your Saturday.</h2>
   <p>
-    See the Sovereign Market demo running live on Google Cloud — then reach out.
-    All serious inquiries get a response within 24 hours.
+    Request a live demo and I'll spin up the full Sovereign Market stack on GCP for you personally.
+    You see it live, ask questions, and decide from there. All serious inquiries answered within 24 hours.
   </p>
   <div class="hero-actions">
-    <a class="btn btn-primary" href="https://demo.skr8tr.online" target="_blank">See It Live ↗</a>
+    <a class="btn btn-primary" href="mailto:scottbaker@rusticagentic.agency?subject=Skr8tr%20Demo%20Request">Request a Live Demo &rarr;</a>
     <a class="btn btn-secondary" href="mailto:scottbaker@rusticagentic.agency?subject=Skr8tr%20Inquiry">Get in Touch &rarr;</a>
   </div>
 </div>
